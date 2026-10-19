@@ -8,14 +8,17 @@ import { getCtx } from './synth.js';
 const HOLD_MS = 110;       // how long a pitch must stay put to count as a played note
 const RELEASE_MS = 90;     // silence needed before the same note can be played again
 const MIN_CLARITY = 0.8;
+const UNCLEAR_MS = 400;    // loud-but-no-clear-note for this long → tell the player
 
 export class Listener {
   /**
    * @param {{onFrame?:(f:object)=>void, onNote?:(n:{midi:number,cents:number,clarity:number})=>void}} cb
    */
-  constructor({ onFrame = () => {}, onNote = () => {} } = {}) {
+  constructor({ onFrame = () => {}, onNote = () => {}, onUnclear = () => {}, onError = () => {} } = {}) {
     this.onFrame = onFrame;
     this.onNote = onNote;
+    this.onUnclear = onUnclear;
+    this.onError = onError;
     this.gate = 0.01;
     this.running = false;
     this.ignoreUntil = 0;
@@ -28,6 +31,8 @@ export class Listener {
     this.centsAcc = [];
     this.registered = null;
     this.unvoicedSince = null;
+    this.unclearSince = null;
+    this.unclearFired = false;
   }
 
   async start() {
@@ -68,11 +73,13 @@ export class Listener {
     if (!this.running) return;
     const now = performance.now();
     let frame = { voiced: false, rms: 0 };
+    let loud = false;
 
     if (now >= this.ignoreUntil) {
       this.analyser.getFloatTimeDomainData(this.buf);
       const r = detectPitch(this.buf, this.ctx.sampleRate);
       const voiced = r.freq && r.rms >= this.gate && r.clarity >= MIN_CLARITY;
+      loud = r.rms >= this.gate;
       frame = { voiced: !!voiced, rms: r.rms, clarity: r.clarity };
       if (voiced) {
         const mf = freqToMidiFloat(r.freq);
@@ -83,10 +90,31 @@ export class Listener {
       }
     }
 
-    this._process(frame, now);
-    this.onFrame(frame);
+    // A broken callback must never stop the listening loop.
+    try {
+      this._trackUnclear(frame, loud, now);
+      this._process(frame, now);
+      this.onFrame(frame);
+    } catch (err) {
+      console.error('Reedroom listener error:', err);
+      try { this.onError(err); } catch { /* ignore */ }
+    }
     this._raf = requestAnimationFrame(this._tick);
   };
+
+  /** Sound is coming in, but there's no clear single note (two holes at once, very breathy…). */
+  _trackUnclear(f, loud, now) {
+    if (f.voiced || !loud) {
+      this.unclearSince = null;
+      this.unclearFired = false;
+      return;
+    }
+    if (this.unclearSince === null) this.unclearSince = now;
+    if (!this.unclearFired && now - this.unclearSince >= UNCLEAR_MS) {
+      this.unclearFired = true;
+      this.onUnclear();
+    }
+  }
 
   _process(f, now) {
     if (!f.voiced) {

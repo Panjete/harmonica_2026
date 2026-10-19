@@ -15,7 +15,25 @@ const harps = [harpPlay, harpEcho];
 const refreshHeat = () => harps.forEach((h) => h.setHeat(store.getStats()));
 refreshHeat();
 
-const mic = new Listener({ onFrame, onNote });
+const mic = new Listener({ onFrame, onNote, onUnclear, onError });
+
+const UNCLEAR_TEXT = 'I can hear sound, but not one clear note. Try covering just one hole, or breathe a little softer.';
+let unclearHoldUntil = 0; // keeps the Play readout message from being wiped on the next frame
+
+function onUnclear() {
+  if (currentView === 'echo' && echo.state === 'listening') {
+    setMsg(UNCLEAR_TEXT);
+  } else if (currentView === 'play' && readout.dataset.state === 'idle') {
+    unclearHoldUntil = performance.now() + 2500;
+    $('hole-text').textContent = UNCLEAR_TEXT;
+  }
+}
+
+function onError(err) {
+  const text = `Something went wrong (${err?.message || err}). Still listening.`;
+  $('mic-status').textContent = text;
+  $('echo-status').textContent = text;
+}
 
 function centsWord(c) {
   const a = Math.abs(c);
@@ -88,7 +106,9 @@ function clearReadout() {
   readout.dataset.state = 'idle';
   delete readout.dataset.dir;
   $('note-big').textContent = '—';
-  $('hole-text').textContent = mic.running ? 'Listening… play a note.' : 'Press “Start listening” and play a note.';
+  if (performance.now() >= unclearHoldUntil) {
+    $('hole-text').textContent = mic.running ? 'Listening… play a note.' : 'Press “Start listening” and play a note.';
+  }
   $('cents-dot').style.left = '50%';
   $('cents-word').innerHTML = '&nbsp;';
   $('steady-fill').style.width = '0';
