@@ -66,3 +66,49 @@ export function playNote(midi, { dur = 0.8, when = 0, gain = 0.16 } = {}) {
     try { saw.stop(now + 0.2); sq.stop(now + 0.2); } catch { /* already stopped */ }
   };
 }
+
+let currentMelodyStops = [];
+let currentMelodyTimers = [];
+
+export function stopMelody() {
+  currentMelodyStops.forEach((fn) => { try { fn(); } catch {} });
+  currentMelodyStops = [];
+  currentMelodyTimers.forEach((t) => clearTimeout(t));
+  currentMelodyTimers = [];
+}
+
+/**
+ * Play a sequence of notes with accurate musical tempo.
+ * @param {Array<{midi:number, beats:number}>} notes
+ * @param {{bpm?:number, onNote?:(idx:number, note:object)=>void, onEnd?:()=>void}} opts
+ */
+export function playMelody(notes, { bpm = 90, onNote = () => {}, onEnd = () => {} } = {}) {
+  stopMelody();
+  const secPerBeat = 60 / bpm;
+  let elapsed = 0;
+
+  notes.forEach((note, i) => {
+    const durSec = Math.max(0.2, (note.beats || 1) * secPerBeat * 0.90);
+    const whenSec = elapsed;
+    const whenMs = whenSec * 1000;
+
+    const stopFn = playNote(note.midi, { dur: durSec, when: whenSec });
+    currentMelodyStops.push(stopFn);
+
+    const timer = setTimeout(() => {
+      onNote(i, note);
+    }, whenMs);
+    currentMelodyTimers.push(timer);
+
+    elapsed += (note.beats || 1) * secPerBeat;
+  });
+
+  const endTimer = setTimeout(() => {
+    currentMelodyStops = [];
+    currentMelodyTimers = [];
+    onEnd();
+  }, elapsed * 1000 + 150);
+  currentMelodyTimers.push(endTimer);
+
+  return stopMelody;
+}

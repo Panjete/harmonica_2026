@@ -1,8 +1,9 @@
-import { ALL_NOTES, midiToLetter, notesForMidi, tab, setRefA4, getNoteRole } from './notes.js';
+import { ALL_NOTES, HOLES, midiToLetter, notesForMidi, tab, setRefA4, getNoteRole } from './notes.js';
 import { Listener } from './mic.js';
-import { playNote } from './synth.js';
+import { playNote, playMelody, stopMelody } from './synth.js';
 import { createHarp } from './harp.js';
 import * as store from './store.js';
+import { SONGS, getSongById } from './songs.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -11,7 +12,8 @@ const $ = (id) => document.getElementById(id);
 // =====================================================================
 const harpPlay = createHarp($('harp-play'), { onPress: (n) => playNote(n.midi, { dur: 0.9 }) });
 const harpEcho = createHarp($('harp-echo'), { onPress: (n) => playNote(n.midi, { dur: 0.9 }) });
-const harps = [harpPlay, harpEcho];
+const harpSong = createHarp($('harp-song'), { onPress: (n) => playNote(n.midi, { dur: 0.9 }) });
+const harps = [harpPlay, harpEcho, harpSong];
 const refreshHeat = () => harps.forEach((h) => h.setHeat(store.getStats()));
 refreshHeat();
 
@@ -47,16 +49,26 @@ let currentView = 'play';
 function go(view) {
   if (view === currentView) return;
   if (currentView === 'echo' && cancelPlayback()) setMsg('Press “Hear it” when you’re ready.');
+  if (currentView === 'songs') {
+    stopMelody();
+    $('btn-song-full-preview')?.classList.remove('playing');
+  }
   currentView = view;
   document.querySelectorAll('.view').forEach((v) => (v.hidden = v.id !== `view-${view}`));
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === view));
   history.replaceState(null, '', `#${view}`);
+
+  if (view === 'songs') renderSongbook();
+  if (view === 'register') renderRegister();
 }
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => go(t.dataset.view)));
 const startView = location.hash.replace('#', '');
 if (startView && document.getElementById(`view-${startView}`)) {
   currentView = 'play';
   go(startView);
+} else {
+  // Pre-render register stats in background
+  setTimeout(renderRegister, 100);
 }
 
 // =====================================================================
@@ -104,6 +116,15 @@ function show(f) {
   const roleEl = $('note-role');
   if (roleEl) {
     roleEl.innerHTML = `<span class="solfege">${role.syllable} (${role.role})</span> · <span class="freq">~${role.freq} Hz</span> · <span class="family">${role.family}</span> · <span class="reg">${role.reg}</span>`;
+  }
+
+  // Update per-reed quality in real-time when a single clear hole is voiced
+  if (matches.length === 1 && f.clarity >= 0.55) {
+    store.recordReedQuality(matches[0].hole, matches[0].dir, {
+      hit: true,
+      cents: f.cents,
+      clarity: f.clarity,
+    });
   }
 
   harps.forEach((h) => h.setLive(f.midi));
@@ -358,7 +379,7 @@ function onMicStopped() {
 
 $('tuning-select')?.addEventListener('change', (e) => setRefA4(+e.target.value));
 
-function onNote(ev) {
+function onEchoNote(ev) {
   if (currentView !== 'echo') return;
   const ear = $('ear-only').checked;
   const canPlay = echo.state === 'listening' || (echo.state === 'ready' && (echo.heard || !ear));
@@ -495,3 +516,536 @@ $('btn-new').addEventListener('click', newPhrase);
 $('btn-restart').addEventListener('click', startOver);
 
 newPhrase();
+
+// Central note dispatcher: routes note events to Echo or Songs
+function onNote(ev) {
+  if (currentView === 'echo') {
+    onEchoNote(ev);
+  } else if (currentView === 'songs' && activeSong) {
+    onSongNote(ev);
+  }
+}
+
+// =====================================================================
+// Songbook: browse, full-tune preview, phrase-by-phrase practice
+// =====================================================================
+let songFilter = 'all';
+let currentPreviewSongId = null;
+let activeSong = null;
+let activePhraseIdx = 0;
+let songPracticeState = 'idle'; // 'idle' | 'playing' | 'listening' | 'done'
+let songPhraseNoteIdx = 0;
+let songPhraseMisses = 0;
+
+function renderSongbook() {
+  const grid = $('songs-grid');
+  if (!grid) return;
+  const progressMap = store.getAllSongProgress();
+
+  const filtered = SONGS.filter((s) => songFilter === 'all' || s.category === songFilter);
+
+  grid.innerHTML = filtered.map((s) => {
+    const prog = progressMap[s.id];
+    let badgeText = 'Unexplored';
+    let badgeClass = '';
+    if (prog?.mastered) {
+      badgeText = 'Mastered ★';
+      badgeClass = 'style="color:var(--ok);border-color:var(--ok);"';
+    } else if (prog?.phrasesCompleted > 0) {
+      badgeText = `Phrase ${prog.phrasesCompleted}/${s.phrases.length}`;
+      badgeClass = 'style="color:var(--amber);border-color:var(--amber);"';
+    }
+
+    const isPlaying = currentPreviewSongId === s.id;
+
+    return `
+      <article class="song-card" data-id="${s.id}">
+        <div class="song-card-top">
+          <span class="guide-tag">${s.tag}</span>
+          <span class="guide-tag" ${badgeClass}>${badgeText}</span>
+        </div>
+        <div>
+          <h3 class="song-card-title">${s.title}</h3>
+          <span class="song-card-artist">${s.artist} (${s.year})</span>
+        </div>
+        <p class="song-card-desc">${s.desc}</p>
+        <div class="song-card-meta">
+          <span>${s.difficulty}</span>
+          <span>·</span>
+          <span>${s.bpm} BPM</span>
+          <span>·</span>
+          <span>${s.phrases.length} phrases</span>
+        </div>
+        <div class="song-card-actions">
+          <button type="button" class="btn btn-preview ${isPlaying ? 'playing' : ''}" data-action="preview" data-id="${s.id}">
+            ${isPlaying ? '⏹ Stop' : '▶ Listen'}
+          </button>
+          <button type="button" class="btn primary" data-action="practice" data-id="${s.id}">
+            Practice
+          </button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+// Filter button clicks
+$('song-filters')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-filter]');
+  if (!btn) return;
+  songFilter = btn.dataset.filter;
+  $('song-filters').querySelectorAll('.filter-btn').forEach((b) => b.classList.toggle('active', b === btn));
+  renderSongbook();
+});
+
+// Song card action clicks (preview or practice)
+$('songs-grid')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const songId = btn.dataset.id;
+  const song = getSongById(songId);
+  if (!song) return;
+
+  if (btn.dataset.action === 'preview') {
+    toggleFullSongPreview(song);
+  } else if (btn.dataset.action === 'practice') {
+    openSongPractice(song);
+  }
+});
+
+function toggleFullSongPreview(song) {
+  if (currentPreviewSongId === song.id) {
+    stopMelody();
+    currentPreviewSongId = null;
+    harps.forEach((h) => h.setLive(null));
+    renderSongbook();
+    updatePracticeTrayPreviewBtn();
+    return;
+  }
+
+  stopMelody();
+  currentPreviewSongId = song.id;
+  renderSongbook();
+  updatePracticeTrayPreviewBtn();
+
+  const allNotes = song.phrases.flatMap((p) => p.notes);
+  playMelody(allNotes, {
+    bpm: song.bpm,
+    onNote: (i, note) => {
+      harps.forEach((h) => h.setLive(note.midi));
+      setTimeout(() => harps.forEach((h) => h.setLive(null)), 240);
+    },
+    onEnd: () => {
+      currentPreviewSongId = null;
+      harps.forEach((h) => h.setLive(null));
+      renderSongbook();
+      updatePracticeTrayPreviewBtn();
+    },
+  });
+}
+
+function updatePracticeTrayPreviewBtn() {
+  const btn = $('btn-song-full-preview');
+  if (!btn) return;
+  const isPlaying = activeSong && currentPreviewSongId === activeSong.id;
+  btn.classList.toggle('playing', isPlaying);
+  $('full-preview-icon').textContent = isPlaying ? '⏹' : '▶';
+  $('full-preview-text').textContent = isPlaying ? 'Stop preview' : 'Listen to full tune';
+}
+
+function openSongPractice(song) {
+  stopMelody();
+  currentPreviewSongId = null;
+  activeSong = song;
+  activePhraseIdx = 0;
+
+  $('song-practice-tray').hidden = false;
+  $('songs-grid').hidden = true;
+
+  $('song-practice-tag').textContent = song.tag;
+  $('song-practice-title').textContent = song.title;
+  $('song-practice-artist').textContent = `${song.artist} (${song.year})`;
+
+  updatePracticeTrayPreviewBtn();
+  renderPhraseStepper();
+  loadSongPhrase(0);
+}
+
+function closeSongPractice() {
+  stopMelody();
+  currentPreviewSongId = null;
+  activeSong = null;
+  songPracticeState = 'idle';
+
+  $('song-practice-tray').hidden = true;
+  $('songs-grid').hidden = false;
+  renderSongbook();
+}
+
+$('btn-song-back')?.addEventListener('click', closeSongPractice);
+$('btn-song-full-preview')?.addEventListener('click', () => {
+  if (activeSong) toggleFullSongPreview(activeSong);
+});
+
+function renderPhraseStepper() {
+  const stepper = $('song-phrase-stepper');
+  if (!stepper || !activeSong) return;
+  const prog = store.getSongProgress(activeSong.id);
+  const completed = prog?.phrasesCompleted || 0;
+
+  stepper.innerHTML = activeSong.phrases.map((p, idx) => {
+    const isDone = completed > idx;
+    const isActive = activePhraseIdx === idx;
+    const cls = ['phrase-step-btn', isActive ? 'active' : '', isDone ? 'done' : ''].filter(Boolean).join(' ');
+    return `<button type="button" class="${cls}" data-idx="${idx}">Phrase ${idx + 1}${isDone ? ' ✓' : ''}</button>`;
+  }).join('');
+}
+
+$('song-phrase-stepper')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-idx]');
+  if (!btn) return;
+  loadSongPhrase(+btn.dataset.idx);
+});
+
+function loadSongPhrase(idx) {
+  activePhraseIdx = idx;
+  songPhraseNoteIdx = 0;
+  songPhraseMisses = 0;
+  songPracticeState = 'idle';
+
+  const phrase = activeSong.phrases[idx];
+  $('song-phrase-label').textContent = phrase.label;
+
+  const prog = store.getSongProgress(activeSong.id);
+  const isDone = (prog?.phrasesCompleted || 0) > idx;
+  $('song-phrase-badge').textContent = isDone ? 'Mastered ✓' : 'In progress';
+  $('song-phrase-badge').className = `phrase-badge ${isDone ? 'mastered' : ''}`;
+
+  $('btn-song-next-phrase').hidden = true;
+  $('song-practice-msg').textContent = 'Press “Hear phrase” to listen, then play it back on your harmonica.';
+
+  renderPhraseSteps(phrase.notes);
+  renderPhraseStepper();
+}
+
+function renderPhraseSteps(notes) {
+  const container = $('song-phrase-steps');
+  if (!container) return;
+  container.innerHTML = notes.map((n, i) => `
+    <div class="step" data-dir="${n.dir}" data-idx="${i}">
+      <span class="sn">${midiToLetter(n.midi)}</span>
+      <span class="st">${n.tab} ${n.dir}</span>
+    </div>
+  `).join('');
+}
+
+async function hearSongPhrase() {
+  if (!activeSong) return;
+  stopMelody();
+  if (!mic.running) await startMic($('song-mic-status'));
+
+  const phrase = activeSong.phrases[activePhraseIdx];
+  songPhraseNoteIdx = 0;
+  songPracticeState = 'playing';
+  $('song-practice-msg').textContent = 'Listen…';
+
+  const stepEls = $('song-phrase-steps').querySelectorAll('.step');
+  stepEls.forEach((el) => el.classList.remove('done', 'miss', 'playing'));
+
+  const secPerBeat = 60 / activeSong.bpm;
+  let totalDur = 0;
+  phrase.notes.forEach((n) => totalDur += (n.beats || 1) * secPerBeat);
+
+  mic.ignoreFor(totalDur * 1000 + 400);
+
+  playMelody(phrase.notes, {
+    bpm: activeSong.bpm,
+    onNote: (i, note) => {
+      stepEls.forEach((el, idx) => el.classList.toggle('playing', idx === i));
+      harpSong.flash(`${note.hole}${note.dir}`, 350);
+    },
+    onEnd: () => {
+      stepEls.forEach((el) => el.classList.remove('playing'));
+      songPracticeState = 'listening';
+      $('song-practice-msg').textContent = `Your turn — play note 1: ${phrase.notes[0].tab} (${phrase.notes[0].dir}).`;
+    },
+  });
+}
+
+$('btn-song-hear-phrase')?.addEventListener('click', hearSongPhrase);
+
+$('btn-song-next-phrase')?.addEventListener('click', () => {
+  if (activeSong && activePhraseIdx < activeSong.phrases.length - 1) {
+    loadSongPhrase(activePhraseIdx + 1);
+  }
+});
+
+function onSongNote(ev) {
+  if (songPracticeState !== 'listening' && songPracticeState !== 'idle') return;
+  if (!activeSong) return;
+
+  const phrase = activeSong.phrases[activePhraseIdx];
+  if (!phrase) return;
+  const want = phrase.notes[songPhraseNoteIdx];
+  if (!want) return;
+
+  const hit = ev.midi === want.midi;
+  const matches = notesForMidi(want.midi);
+  const where = matches.length ? `hole ${matches[0].hole} ${matches[0].dir}` : '';
+
+  // Record reed performance in local store
+  if (matches.length) {
+    store.recordReedQuality(matches[0].hole, matches[0].dir, {
+      hit,
+      cents: ev.cents,
+      clarity: ev.clarity,
+    });
+  }
+
+  if (hit) {
+    harpSong.cue(null);
+    mic.resetRegistered();
+
+    const stepEls = $('song-phrase-steps').querySelectorAll('.step');
+    stepEls[songPhraseNoteIdx]?.classList.remove('miss');
+    stepEls[songPhraseNoteIdx]?.classList.add('done');
+
+    songPhraseNoteIdx++;
+
+    if (songPhraseNoteIdx >= phrase.notes.length) {
+      // Phrase completed!
+      songPracticeState = 'done';
+      store.updateSongProgress(activeSong.id, activePhraseIdx, activeSong.phrases.length);
+      store.addLogEntry(`Practiced ${activeSong.title} — mastered Phrase ${activePhraseIdx + 1}`);
+      refreshHeat();
+
+      const isLastPhrase = activePhraseIdx >= activeSong.phrases.length - 1;
+      $('song-practice-msg').textContent = isLastPhrase
+        ? `You completed the whole song! Beautifully played.`
+        : `Phrase ${activePhraseIdx + 1} complete! Ready for the next phrase?`;
+
+      if (!isLastPhrase) {
+        $('btn-song-next-phrase').hidden = false;
+        $('btn-song-next-phrase').textContent = `Next phrase (${activePhraseIdx + 2}/${activeSong.phrases.length}) →`;
+      } else {
+        $('btn-song-next-phrase').hidden = true;
+      }
+      renderPhraseStepper();
+    } else {
+      $('song-practice-msg').textContent = `Good! Next note: ${phrase.notes[songPhraseNoteIdx].tab} (${phrase.notes[songPhraseNoteIdx].dir}).`;
+    }
+    return;
+  }
+
+  // Mistake:
+  songPhraseMisses++;
+  const heard = midiToLetter(ev.midi);
+  const targetId = matches.length ? matches[0].id : null;
+  if (targetId) harpSong.cue(targetId);
+
+  const stepEls = $('song-phrase-steps').querySelectorAll('.step');
+  stepEls[songPhraseNoteIdx]?.classList.add('miss');
+  setTimeout(() => stepEls[songPhraseNoteIdx]?.classList.remove('miss'), 500);
+
+  const dirGuide = ev.midi < want.midi ? 'slide right' : 'slide left';
+  $('song-practice-msg').textContent = `Heard ${heard} — looking for ${where}. Try to ${dirGuide}!`;
+}
+
+// =====================================================================
+// Register & Stats: exploration checklist, hole health matrix, activity
+// =====================================================================
+function renderRegister() {
+  const songs = SONGS;
+  const songProgress = store.getAllSongProgress();
+  const reedStats = store.getReedQuality();
+  const journal = store.getJournal();
+
+  // Summary counts
+  let exploredCount = 0;
+  let masteredPhrasesCount = 0;
+  songs.forEach((s) => {
+    const prog = songProgress[s.id];
+    if (prog && prog.phrasesCompleted > 0) exploredCount++;
+    if (prog) masteredPhrasesCount += (prog.phrasesCompleted || 0);
+  });
+
+  if ($('stat-songs-explored')) $('stat-songs-explored').textContent = `${exploredCount} / ${songs.length}`;
+  if ($('stat-phrases-mastered')) $('stat-phrases-mastered').textContent = masteredPhrasesCount;
+
+  // Average clarity
+  const reedEntries = Object.values(reedStats);
+  let totalAttempts = 0;
+  let claritySum = 0;
+  reedEntries.forEach((r) => {
+    totalAttempts += (r.attempts || 0);
+    claritySum += (r.avgClarity || 0.8) * (r.attempts || 1);
+  });
+  const avgClarity = totalAttempts > 0 ? Math.round((claritySum / (totalAttempts || 1)) * 100) : null;
+  if ($('stat-overall-clarity')) $('stat-overall-clarity').textContent = avgClarity ? `${avgClarity}%` : '—';
+  if ($('stat-total-notes')) $('stat-total-notes').textContent = totalAttempts;
+
+  // Render Hole Health Matrix
+  renderHoleHealthMatrix(reedStats);
+
+  // Render Songbook Checklist
+  renderSongChecklist(songProgress);
+
+  // Render Activity Log
+  renderActivityLog(journal);
+}
+
+function renderHoleHealthMatrix(reedStats) {
+  const container = $('hole-health-matrix');
+  if (!container) return;
+
+  container.innerHTML = HOLES.map((h) => {
+    const bId = `${h.hole}blow`;
+    const dId = `${h.hole}draw`;
+    const bStat = reedStats[bId] || { attempts: 0, hits: 0, avgCents: 0, avgClarity: 0.8 };
+    const dStat = reedStats[dId] || { attempts: 0, hits: 0, avgCents: 0, avgClarity: 0.8 };
+
+    const bAcc = bStat.attempts > 0 ? Math.round((bStat.hits / bStat.attempts) * 100) : 25;
+    const dAcc = dStat.attempts > 0 ? Math.round((dStat.hits / dStat.attempts) * 100) : 25;
+
+    return `
+      <div class="hm-col">
+        <button type="button" class="hm-cell blow" data-hole="${h.hole}" data-dir="blow" data-midi="${h.blow}" aria-label="Hole ${h.hole} Blow details">
+          <span class="hm-note">${midiToLetter(h.blow)}</span>
+          <span class="hm-tab">${h.hole}</span>
+          <div class="hm-bar"><div class="hm-bar-fill" style="width:${bAcc}%"></div></div>
+          <span class="hm-cents">${bStat.attempts > 0 ? (bStat.avgCents >= 0 ? `+${bStat.avgCents}¢` : `${bStat.avgCents}¢`) : '—'}</span>
+        </button>
+        <span class="hm-hole-num">${h.hole}</span>
+        <button type="button" class="hm-cell draw" data-hole="${h.hole}" data-dir="draw" data-midi="${h.draw}" aria-label="Hole ${h.hole} Draw details">
+          <span class="hm-note">${midiToLetter(h.draw)}</span>
+          <span class="hm-tab">−${h.hole}</span>
+          <div class="hm-bar"><div class="hm-bar-fill" style="width:${dAcc}%"></div></div>
+          <span class="hm-cents">${dStat.attempts > 0 ? (dStat.avgCents >= 0 ? `+${dStat.avgCents}¢` : `${dStat.avgCents}¢`) : '—'}</span>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+$('hole-health-matrix')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.hm-cell');
+  if (!btn) return;
+  const hole = +btn.dataset.hole;
+  const dir = btn.dataset.dir;
+  const midi = +btn.dataset.midi;
+
+  // Highlight active inspection cell
+  $('hole-health-matrix').querySelectorAll('.hm-cell').forEach((c) => c.classList.toggle('active-inspect', c === btn));
+
+  inspectHole(hole, dir, midi);
+});
+
+function inspectHole(hole, dir, midi) {
+  const detailEl = $('hole-health-detail');
+  if (!detailEl) return;
+
+  const role = getNoteRole(midi);
+  const id = `${hole}${dir}`;
+  const stat = store.getReedQuality()[id] || { attempts: 0, hits: 0, avgCents: 0, avgClarity: 0.8 };
+  const acc = stat.attempts > 0 ? Math.round((stat.hits / stat.attempts) * 100) : 0;
+  const clarity = Math.round((stat.avgClarity || 0.8) * 100);
+
+  // Personalized coaching tip based on acoustics & reed location
+  let tip = '';
+  if (hole <= 3) {
+    tip = '<b>Rhythm & Chords Zone:</b> Foundation of the harmonica. For clean single notes, drop your jaw slightly and relax your tongue to avoid sounding neighbors.';
+  } else if (hole === 2 && dir === 'draw') {
+    tip = '<b>Hole 2 Draw (G4):</b> The infamous beginner challenge. If it sounds flat or chokes, breathe gently from your belly with an open throat, like saying “ahhh”.';
+  } else if (hole >= 4 && hole <= 7) {
+    tip = '<b>Core Melody Zone:</b> Contains your full Do-Re-Mi scale. Pucker your lips like sipping through a narrow coffee straw to maintain isolation.';
+  } else {
+    tip = '<b>High Register (Holes 8–10):</b> Short, delicate reeds. Whisper your breath gently. Too much breath pressure causes these high reeds to choke or bend flat!';
+  }
+
+  detailEl.hidden = false;
+  detailEl.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.5rem;">
+      <h4 style="margin:0; font-size:1.15rem; font-family:var(--display);">
+        Hole ${hole} ${dir === 'blow' ? 'Blow (Exhale)' : 'Draw (Inhale)'} · ${role.letter} (${role.syllable})
+      </h4>
+      <span style="font-size:.85rem; color:var(--amber); font-weight:600;">${role.role}</span>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:1.4rem; font-size:.85rem; color:var(--dim); margin-bottom:.6rem;">
+      <span>Attempts: <b style="color:var(--text);">${stat.attempts}</b></span>
+      <span>Accuracy: <b style="color:var(--text);">${acc}%</b></span>
+      <span>Tone Clarity: <b style="color:var(--text);">${clarity}%</b></span>
+      <span>Intonation Bias: <b style="color:var(--text);">${stat.attempts > 0 ? (stat.avgCents >= 0 ? `+${stat.avgCents}¢` : `${stat.avgCents}¢`) : 'Centered'}</b></span>
+    </div>
+    <p style="margin:0; font-size:.88rem; color:var(--text);">${tip}</p>
+  `;
+}
+
+function renderSongChecklist(songProgress) {
+  const container = $('song-checklist');
+  if (!container) return;
+
+  container.innerHTML = SONGS.map((s) => {
+    const prog = songProgress[s.id];
+    let statusText = 'Unexplored';
+    let statusClass = '';
+    if (prog?.mastered) {
+      statusText = 'Mastered ★';
+      statusClass = 'mastered';
+    } else if (prog?.phrasesCompleted > 0) {
+      statusText = `Phrase ${prog.phrasesCompleted}/${s.phrases.length}`;
+      statusClass = 'in-progress';
+    }
+
+    return `
+      <div class="cli-item">
+        <div class="cli-meta">
+          <h5>${s.title}</h5>
+          <small>${s.artist} · ${s.difficulty}</small>
+        </div>
+        <span class="cli-status ${statusClass}">${statusText}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderActivityLog(journal) {
+  const list = $('activity-log');
+  if (!list) return;
+
+  if (!journal.length) {
+    list.innerHTML = `<li class="log-item" style="color:var(--faint);">No practice activity recorded yet. Start playing in Play, Songs, or Echo!</li>`;
+    return;
+  }
+
+  list.innerHTML = journal.map((item) => {
+    const d = new Date(item.ts);
+    const timeStr = `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return `
+      <li class="log-item">
+        <span class="log-time">${timeStr}</span>
+        <span class="log-text">${item.text}</span>
+      </li>
+    `;
+  }).join('');
+}
+
+// Data Export & Reset Handlers
+$('btn-export-data')?.addEventListener('click', () => {
+  const json = store.exportDataJSON();
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `harmonica_lessons_record_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+$('btn-reset-data')?.addEventListener('click', () => {
+  if (confirm('Are you sure you want to reset your practice stats and records? This will clear your locally stored matrix.')) {
+    store.resetAllData();
+    renderRegister();
+    refreshHeat();
+    alert('Practice data has been reset.');
+  }
+});

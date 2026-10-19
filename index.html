@@ -17,7 +17,9 @@
     <h1 class="brand">Reed<em>room</em></h1>
     <nav class="tabs" aria-label="Sections">
       <button class="tab active" data-view="play" id="tab-play">Play</button>
+      <button class="tab" data-view="songs" id="tab-songs">Songs</button>
       <button class="tab" data-view="echo" id="tab-echo">Echo</button>
+      <button class="tab" data-view="register" id="tab-register">Register &amp; Stats</button>
       <button class="tab" data-view="guide" id="tab-guide">The Map &amp; Notes</button>
     </nav>
     <button class="mic-pill" id="mic-pill" type="button" aria-pressed="false">
@@ -81,6 +83,62 @@
       </p>
     </section>
 
+    <!-- ================= SONGS ================= -->
+    <section id="view-songs" class="view" hidden>
+      <div class="songs-header">
+        <div>
+          <h2 class="view-title">Songbook</h2>
+          <p class="lede">Real melodies arranged for the 10-hole C harmonica. Listen to how each tune should sound, then learn it phrase by phrase.</p>
+        </div>
+        <div class="song-filters" id="song-filters" role="radiogroup" aria-label="Song filter">
+          <button type="button" class="filter-btn active" data-filter="all">All Songs</button>
+          <button type="button" class="filter-btn" data-filter="modern">2010+ Hits</button>
+          <button type="button" class="filter-btn" data-filter="classic">Classics</button>
+        </div>
+      </div>
+
+      <!-- SONG PRACTICE TRAY (Visible when practicing a specific song) -->
+      <div id="song-practice-tray" class="practice-tray" hidden>
+        <div class="practice-top">
+          <button type="button" class="btn ghost back-btn" id="btn-song-back">← Back to Songbook</button>
+          <div class="practice-meta">
+            <span class="guide-tag" id="song-practice-tag">Pop</span>
+            <h3 class="practice-title" id="song-practice-title">Piano Man</h3>
+            <span class="practice-artist" id="song-practice-artist">Billy Joel (1973)</span>
+          </div>
+          <div class="full-audio-control">
+            <button type="button" class="btn" id="btn-song-full-preview">
+              <span id="full-preview-icon">▶</span> <span id="full-preview-text">Listen to full tune</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Phrase Stepper Tabs -->
+        <div class="phrase-stepper" id="song-phrase-stepper"></div>
+
+        <!-- Phrase Active Area -->
+        <div class="phrase-active-card">
+          <div class="phrase-info-bar">
+            <h4 id="song-phrase-label">Phrase 1</h4>
+            <span class="phrase-badge" id="song-phrase-badge">Not started</span>
+          </div>
+          <div class="phrase" id="song-phrase-steps"></div>
+          <p class="echo-msg" id="song-practice-msg">Press “Hear phrase” to listen, then play it on your harmonica.</p>
+          <div class="song-actions">
+            <button class="btn primary" id="btn-song-hear-phrase" type="button">Hear phrase</button>
+            <button class="btn" id="btn-song-next-phrase" type="button" hidden>Next phrase →</button>
+            <span class="status" id="song-mic-status" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <div id="harp-song" aria-label="Harmonica map"></div>
+        <p class="legend">Tabs: <b>4</b> means blow into hole 4. <b>−4</b> means draw (inhale) on hole 4.</p>
+      </div>
+
+      <!-- SONG CARDS GRID (Visible when browsing) -->
+      <div class="songs-grid" id="songs-grid"></div>
+    </section>
+
     <!-- ================= ECHO ================= -->
     <section id="view-echo" class="view" hidden>
       <h2 class="view-title">Echo</h2>
@@ -116,6 +174,65 @@
 
       <div id="harp-echo" aria-label="Harmonica map"></div>
       <p class="legend">Use headphones if you can, so the mic doesn't hear the speakers.</p>
+    </section>
+
+    <!-- ================= REGISTER & STATS ================= -->
+    <section id="view-register" class="view" hidden>
+      <h2 class="view-title">Exploration &amp; Quality Record</h2>
+      <p class="lede">Your personal progress register. Everything stays private on your machine in fixed-size storage.</p>
+
+      <div class="register-summary-grid">
+        <div class="stat-card">
+          <span class="stat-num" id="stat-songs-explored">0 / 12</span>
+          <span class="stat-label">Songs Explored</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="stat-phrases-mastered">0</span>
+          <span class="stat-label">Phrases Mastered</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="stat-overall-clarity">—</span>
+          <span class="stat-label">Avg Tone Clarity</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="stat-total-notes">0</span>
+          <span class="stat-label">Notes Voiced</span>
+        </div>
+      </div>
+
+      <!-- Hole Health Matrix (Per-Hole Quality Record) -->
+      <div class="register-section">
+        <div class="reg-sec-header">
+          <h3>Hole Health Matrix</h3>
+          <p>Live measurement of your accuracy, embouchure tone clarity, and pitch intonation per hole. Tap any cell to view tips.</p>
+        </div>
+        <div id="hole-health-matrix" class="hole-matrix-wrap"></div>
+        <div id="hole-health-detail" class="hole-health-detail" hidden></div>
+      </div>
+
+      <!-- Song Register Checklist -->
+      <div class="register-section">
+        <div class="reg-sec-header">
+          <h3>Songbook Checklist</h3>
+          <p>Every song in your catalog and your mastery status.</p>
+        </div>
+        <div class="song-checklist" id="song-checklist"></div>
+      </div>
+
+      <!-- Recent Practice Activity (Ring Buffer) -->
+      <div class="register-section">
+        <div class="reg-sec-header">
+          <h3>Recent Activity</h3>
+          <p>Rolling log of recent sessions (capped at last 50 items).</p>
+        </div>
+        <ul class="activity-log" id="activity-log"></ul>
+      </div>
+
+      <!-- Data Management -->
+      <div class="register-footer">
+        <button type="button" class="btn ghost" id="btn-export-data">Export My Record (JSON)</button>
+        <button type="button" class="btn ghost danger" id="btn-reset-data">Reset All Data</button>
+      </div>
     </section>
 
     <!-- ================= GUIDE: THE MAP & NOTES ================= -->
