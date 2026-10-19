@@ -54,6 +54,14 @@
           <span>Mic sensitivity</span>
           <input type="range" id="sens" min="0" max="100" value="85">
         </label>
+        <label class="field">
+          <span>Tuning</span>
+          <select id="tuning-select" class="select-clean" aria-label="Harmonica reference tuning">
+            <option value="443" selected>Harmonica (A=443Hz)</option>
+            <option value="440">Concert (A=440Hz)</option>
+            <option value="442">European (A=442Hz)</option>
+          </select>
+        </label>
         <div class="level" aria-label="Mic level"><i id="level-fill"></i></div>
         <span class="status" id="mic-status" aria-live="polite"></span>
       </div>
@@ -84,8 +92,12 @@
           <button type="button" id="len-up" aria-label="Longer">+</button>
         </div>
         <label class="toggle">
+          <input type="checkbox" id="reset-on-miss" checked>
+          <span>Reset on mistake <small>(replay from start)</small></span>
+        </label>
+        <label class="toggle">
           <input type="checkbox" id="ear-only">
-          <span>Ear only <small>(hide the notes until you find them)</small></span>
+          <span>Ear only <small>(hide the notes)</small></span>
         </label>
       </div>
 

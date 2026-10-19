@@ -176,6 +176,20 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
 
 .field { display: flex; align-items: center; gap: .8rem; font-size: .85rem; color: var(--dim); }
 .field input[type='range'] { width: 9rem; accent-color: var(--blow); }
+.field select.select-clean {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: .35rem .75rem;
+  border-radius: 999px;
+  font: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .3s var(--ease);
+}
+.field select.select-clean:hover { border-color: var(--faint); }
+.field select.select-clean:focus-visible { outline: 2px solid var(--amber); }
 .level { width: 7rem; height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
 #level-fill { display: block; height: 100%; width: 0; background: var(--blow); opacity: .75; transition: width .08s linear; }
 .status { font-size: .85rem; color: var(--dim); }
@@ -285,6 +299,16 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
 }
 .step.next { border-color: color-mix(in srgb, var(--c) 55%, var(--line)); animation: breathe 3.2s ease-in-out infinite; }
 .step.done { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); animation: none; }
+.step.miss {
+  border-color: var(--draw);
+  background: color-mix(in srgb, var(--draw) 20%, var(--surface));
+  animation: gentle-shake .35s ease;
+}
+@keyframes gentle-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
 
 /* ear-only: hide the notes until you've found them */
 .phrase.ear .step:not(.done) .sn,

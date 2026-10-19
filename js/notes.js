@@ -3,8 +3,14 @@
 
 export const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 
-export const midiToFreq = (m) => 440 * 2 ** ((m - 69) / 12);
-export const freqToMidiFloat = (f) => 69 + 12 * Math.log2(f / 440);
+// Harmonicas are tuned at the factory to A4 = 442–444 Hz (Hohner/Lee Oskar/Suzuki)
+// so chords sound sweet and blowing pressure doesn't pull them flat.
+// We default to 443 Hz so real harmonica notes center at 0 cents instead of reading sharp.
+export let refA4 = 443;
+export const setRefA4 = (hz) => { refA4 = hz; };
+
+export const midiToFreq = (m) => refA4 * 2 ** ((m - 69) / 12);
+export const freqToMidiFloat = (f) => 69 + 12 * Math.log2(f / refA4);
 export const midiToName = (m) => NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
 /** Just the letter (C, D, F♯…). Height is shown by position on the map, so no octave number. */
 export const midiToLetter = (m) => NOTE_NAMES[((m % 12) + 12) % 12];

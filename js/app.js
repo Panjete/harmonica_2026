@@ -1,4 +1,4 @@
-import { ALL_NOTES, midiToLetter, notesForMidi, tab } from './notes.js';
+import { ALL_NOTES, midiToLetter, notesForMidi, tab, setRefA4 } from './notes.js';
 import { Listener } from './mic.js';
 import { playNote } from './synth.js';
 import { createHarp } from './harp.js';
@@ -347,6 +347,8 @@ function onMicStopped() {
   }
 }
 
+$('tuning-select')?.addEventListener('change', (e) => setRefA4(+e.target.value));
+
 function onNote(ev) {
   if (currentView !== 'echo') return;
   const ear = $('ear-only').checked;
@@ -356,6 +358,7 @@ function onNote(ev) {
 
   const i = echo.idx;
   const want = echo.phrase[i];
+  if (!want) return;
   const hit = ev.midi === want.midi;
 
   if (!echo.attempted[i]) {            // first attempt on this note only
@@ -364,9 +367,12 @@ function onNote(ev) {
     refreshHeat();
   }
 
+  // Always re-arm the mic listener so the user can immediately play the next or retry note
+  mic.resetRegistered();
+
   if (hit) {
     const el = stepEl(i);
-    el?.classList.remove('hint');
+    el?.classList.remove('hint', 'miss');
     el?.classList.add('done');
     echo.idx++;
     if (echo.idx >= echo.phrase.length) {
@@ -381,13 +387,26 @@ function onNote(ev) {
     return;
   }
 
-  // Wrong note: stay on this note. Never reset.
+  // Wrong note:
   echo.misses[i] = (echo.misses[i] || 0) + 1;
   const heard = midiToLetter(ev.midi);
   const heardHoles = notesForMidi(ev.midi)
     .map((n) => `hole ${n.hole} ${n.dir}`)
     .join(' or ');
 
+  const resetOnMiss = $('reset-on-miss')?.checked;
+  if (resetOnMiss) {
+    const el = stepEl(i);
+    el?.classList.add('miss');
+    setTimeout(() => el?.classList.remove('miss'), 500);
+    setMsg(`Heard ${heard}${heardHoles ? ` (${heardHoles})` : ''} instead of ${want.letter}. Resetting phrase to note 1 — let’s try it again!`);
+    echo.idx = 0;
+    clearMarks();
+    refreshEchoUI();
+    return;
+  }
+
+  // If "Reset on mistake" is unchecked: wait on current note
   if (echo.misses[i] >= HINT_AFTER) {
     stepEl(i)?.classList.add('hint');
     setMsg(`Here's a hint: it's ${want.letter}, ${want.where}. No rush.`);

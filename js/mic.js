@@ -5,10 +5,10 @@ import { detectPitch } from './pitch.js';
 import { freqToMidiFloat } from './notes.js';
 import { getCtx } from './synth.js';
 
-const HOLD_MS = 110;       // how long a pitch must stay put to count as a played note
-const RELEASE_MS = 90;     // silence needed before the same note can be played again
-const MIN_CLARITY = 0.8;
-const UNCLEAR_MS = 400;    // loud-but-no-clear-note for this long → tell the player
+const HOLD_MS = 90;        // how long a pitch must stay put to count as a played note
+const RELEASE_MS = 60;     // silence needed before the same note can re-arm
+const MIN_CLARITY = 0.55;  // 0.55 allows breathy/high harmonica notes without getting rejected
+const UNCLEAR_MS = 600;    // loud-but-no-clear-note for this long → tell the player
 
 export class Listener {
   /**
@@ -19,7 +19,7 @@ export class Listener {
     this.onNote = onNote;
     this.onUnclear = onUnclear;
     this.onError = onError;
-    this.gate = 0.01;
+    this.gate = 0.005;
     this.running = false;
     this.ignoreUntil = 0;
     this._reset();
@@ -30,9 +30,19 @@ export class Listener {
     this.candSince = 0;
     this.centsAcc = [];
     this.registered = null;
+    this.registeredTime = 0;
     this.unvoicedSince = null;
     this.unclearSince = null;
     this.unclearFired = false;
+  }
+
+  /** Force re-arm so the user can play the same or next note immediately. */
+  resetRegistered() {
+    this.registered = null;
+    this.registeredTime = 0;
+    this.cand = null;
+    this.candSince = 0;
+    this.centsAcc = [];
   }
 
   async start() {
@@ -78,8 +88,8 @@ export class Listener {
     if (now >= this.ignoreUntil) {
       this.analyser.getFloatTimeDomainData(this.buf);
       const r = detectPitch(this.buf, this.ctx.sampleRate);
-      const voiced = r.freq && r.rms >= this.gate && r.clarity >= MIN_CLARITY;
       loud = r.rms >= this.gate;
+      const voiced = r.freq && loud && r.clarity >= MIN_CLARITY;
       frame = { voiced: !!voiced, rms: r.rms, clarity: r.clarity };
       if (voiced) {
         const mf = freqToMidiFloat(r.freq);
@@ -134,8 +144,12 @@ export class Listener {
       return;
     }
     this.centsAcc.push(f.cents);
-    if (now - this.candSince >= HOLD_MS && this.registered !== f.midi) {
+
+    // Can register if it's a new pitch, or after 450ms of holding (re-trigger)
+    const canRegister = (this.registered !== f.midi) || (now - this.registeredTime >= 450);
+    if (now - this.candSince >= HOLD_MS && canRegister) {
       this.registered = f.midi;
+      this.registeredTime = now;
       const cents = this.centsAcc.reduce((a, b) => a + b, 0) / this.centsAcc.length;
       this.onNote({ midi: f.midi, cents, clarity: f.clarity });
     }
