@@ -57,4 +57,12 @@ export function playNote(midi, { dur = 0.8, when = 0, gain = 0.16 } = {}) {
   sq.start(t);
   saw.stop(t + dur + 0.05);
   sq.stop(t + dur + 0.05);
+
+  /** Fade out quickly and stop (used when a phrase is interrupted). */
+  return () => {
+    const now = c.currentTime;
+    out.gain.cancelScheduledValues(now);
+    out.gain.setTargetAtTime(0.0001, now, 0.03);
+    try { saw.stop(now + 0.2); sq.stop(now + 0.2); } catch { /* already stopped */ }
+  };
 }

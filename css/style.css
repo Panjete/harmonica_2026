@@ -294,6 +294,13 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
   border-radius: 50%; background: var(--faint);
 }
 .phrase.ear .step.playing::before { background: var(--c); }
+/* after a few misses, reveal the note even in ear-only mode */
+.phrase.ear .step.hint:not(.done) .sn,
+.phrase.ear .step.hint:not(.done) .st { display: block; }
+.phrase.ear .step.hint:not(.done)::before { display: none; }
+
+.btn.ghost { background: transparent; color: var(--dim); }
+.btn.ghost:hover { color: var(--text); background: var(--surface); }
 
 .echo-msg { min-height: 2.4em; margin: 0 0 1.2rem; font-size: 1.25rem; color: var(--text); }
 .echo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.4rem; margin-bottom: 2rem; }

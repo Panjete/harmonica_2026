@@ -28,7 +28,7 @@ function centsWord(c) {
 let currentView = 'play';
 function go(view) {
   if (view === currentView) return;
-  if (currentView === 'echo') cancelPlayback();
+  if (currentView === 'echo' && cancelPlayback()) setMsg('Press “Hear it” when you’re ready.');
   currentView = view;
   document.querySelectorAll('.view').forEach((v) => (v.hidden = v.id !== `view-${view}`));
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === view));
@@ -118,6 +118,7 @@ async function toggleMic() {
     mic.stop();
     updateMicUI();
     clearReadout();
+    onMicStopped();
     return;
   }
   await startMic($('mic-status'));
@@ -136,6 +137,28 @@ updateMicUI();
 
 // =====================================================================
 // Echo tab: I play a phrase, you play it back
+//
+// STATES
+//   ready      Phrase on screen, nothing playing.
+//                Hear it   → playing
+//                Start over→ ready at note 1
+//                you play  → listening (only if you've heard it, or notes are visible)
+//   playing    I'm playing the phrase; the mic is ignored so it doesn't hear me.
+//                finished  → listening (mic on) / ready (mic off)
+//                interrupt → ready, progress kept
+//   listening  Waiting for note `idx`.
+//                right note → idx+1, or complete after the last one
+//                wrong note → STAY on the same note. Never resets. After 3 misses, a hint appears.
+//                mic off    → ready, progress kept
+//   complete   Whole phrase matched.
+//                Hear it again → playing from note 1;  New phrase → ready
+//
+// Hear it mid-phrase replays everything, then resumes at the note you were on.
+// Leaving the tab pauses playback; progress is kept.
+// Changing holes / length / New phrase always starts a fresh phrase.
+//
+// STATS: only the FIRST attempt on each note of a phrase is recorded, so exploring
+// and retrying doesn't punish you. The thin bars on the map show first-try rate.
 // =====================================================================
 const POOLS = {
   stair: { label: 'The staircase', sub: 'holes 4–6', holes: [4, 5, 6] },
@@ -145,8 +168,14 @@ const POOLS = {
 };
 const STEP_MS = 800;   // time between notes when I play the phrase
 const NOTE_MS = 620;   // how long each note rings
+const HINT_AFTER = 3;  // misses on one note before the hint appears
 
-const echo = { pool: 'stair', len: 3, phrase: [], idx: 0, state: 'idle', timers: [], done: false };
+const echo = {
+  pool: 'stair', len: 3,
+  phrase: [], idx: 0, state: 'ready', heard: false,
+  misses: [], attempted: [],
+  timers: [], stops: [],
+};
 
 function makePhrase(poolKey, len) {
   const holes = POOLS[poolKey].holes;
@@ -163,6 +192,7 @@ function makePhrase(poolKey, len) {
       id: note.id,
       letter: midiToLetter(note.midi),
       tabs: here.map(tab).join(' / '),
+      where: here.map((n) => `hole ${n.hole} ${n.dir}`).join(' or '),
       dir: dirs.size > 1 ? 'both' : note.dir,
     });
     // random walk by 1–2 steps, never repeating the same note back-to-back
@@ -172,9 +202,11 @@ function makePhrase(poolKey, len) {
   return out;
 }
 
+const stepEl = (i) => $('phrase').querySelector(`.step[data-i="${i}"]`);
+const setMsg = (text) => ($('echo-msg').textContent = text);
+
 function renderPhrase() {
-  const box = $('phrase');
-  box.innerHTML = echo.phrase
+  $('phrase').innerHTML = echo.phrase
     .map(
       (s, i) => `
     <div class="step" data-i="${i}" data-dir="${s.dir}">
@@ -183,60 +215,89 @@ function renderPhrase() {
     </div>`
     )
     .join('');
-  box.classList.toggle('ear', $('ear-only').checked);
-  markNext();
+  $('phrase').classList.toggle('ear', $('ear-only').checked);
 }
 
-const stepEl = (i) => $('phrase').querySelector(`.step[data-i="${i}"]`);
+function clearMarks(from = 0) {
+  document.querySelectorAll('#phrase .step').forEach((el) => {
+    if (+el.dataset.i >= from) el.classList.remove('done', 'hint');
+  });
+}
 
-function markNext() {
+function refreshEchoUI() {
+  // which note is "next"
   document.querySelectorAll('#phrase .step').forEach((el) => el.classList.remove('next'));
-  if (echo.state === 'listening') stepEl(echo.idx)?.classList.add('next');
-}
+  if (echo.state === 'listening' || (echo.state === 'ready' && echo.idx > 0)) stepEl(echo.idx)?.classList.add('next');
 
-function setMsg(text) {
-  $('echo-msg').textContent = text;
-}
-
-function updateEchoButtons() {
-  $('btn-hear').textContent = echo.done ? 'Hear it again' : 'Hear it';
-  $('btn-new').classList.toggle('primary', echo.done);
-  $('btn-hear').classList.toggle('primary', !echo.done);
+  const complete = echo.state === 'complete';
+  $('btn-hear').textContent = complete || echo.idx > 0 ? 'Hear it again' : 'Hear it';
+  $('btn-hear').classList.toggle('primary', !complete);
+  $('btn-new').classList.toggle('primary', complete);
+  $('btn-restart').hidden = !(echo.idx > 0 && !complete);
   const n = store.getRounds();
   $('rounds').textContent = n ? `${n} phrase${n === 1 ? '' : 's'} played back so far` : '';
 }
 
+function setState(s) {
+  echo.state = s;
+  refreshEchoUI();
+}
+
+/** Stop any phrase in progress. Returns true if a playing phrase was interrupted. */
 function cancelPlayback() {
   echo.timers.forEach(clearTimeout);
   echo.timers = [];
-  if (echo.state === 'playing') echo.state = 'idle';
+  echo.stops.forEach((stop) => stop());
+  echo.stops = [];
   document.querySelectorAll('#phrase .step').forEach((el) => el.classList.remove('playing'));
+  if (echo.state === 'playing') {
+    setState('ready');
+    return true;
+  }
+  return false;
 }
 
 function newPhrase() {
   cancelPlayback();
   echo.phrase = makePhrase(echo.pool, echo.len);
   echo.idx = 0;
-  echo.state = 'idle';
-  echo.done = false;
+  echo.heard = false;
+  echo.misses = [];
+  echo.attempted = [];
   renderPhrase();
   setMsg('Press “Hear it”.');
-  updateEchoButtons();
+  setState('ready');
+}
+
+function startOver() {
+  cancelPlayback();
+  echo.idx = 0;
+  echo.misses = [];
+  clearMarks();
+  setMsg('Back to the first note. Press “Hear it”, or just start playing.');
+  setState('ready');
 }
 
 async function hear() {
   cancelPlayback();
   if (!mic.running) await startMic($('echo-status'));
-  echo.state = 'playing';
-  echo.idx = 0;
-  echo.done = false;
-  document.querySelectorAll('#phrase .step').forEach((el) => el.classList.remove('done', 'next'));
+
+  // Resume where you were, unless the phrase was already finished.
+  if (echo.state === 'complete') echo.idx = 0;
+  const resumeAt = echo.idx;
+  if (resumeAt === 0) {
+    echo.misses = [];
+    clearMarks();
+  }
+
+  echo.heard = true;
+  setState('playing');
   setMsg('Listen…');
 
   const total = echo.phrase.length * STEP_MS;
   mic.ignoreFor(total + 450); // don't hear my own speakers
   echo.phrase.forEach((s, i) => {
-    playNote(s.midi, { when: (i * STEP_MS) / 1000, dur: NOTE_MS / 1000 });
+    echo.stops.push(playNote(s.midi, { when: (i * STEP_MS) / 1000, dur: NOTE_MS / 1000 }));
     echo.timers.push(
       setTimeout(() => {
         stepEl(i)?.classList.add('playing');
@@ -247,49 +308,78 @@ async function hear() {
   });
   echo.timers.push(
     setTimeout(() => {
-      echo.state = 'listening';
-      markNext();
-      setMsg(mic.running ? 'Your turn — play the first note.' : 'Your turn (the mic is off, so play along by ear).');
+      echo.stops = [];
+      if (mic.running) {
+        setState('listening');
+        setMsg(resumeAt > 0 ? `Your turn — pick up at note ${resumeAt + 1}.` : 'Your turn — play the first note.');
+      } else {
+        setState('ready');
+        setMsg('The mic is off. Press “Start listening” (top right), then play it back.');
+      }
     }, total + 200)
   );
-  updateEchoButtons();
+}
+
+function onMicStopped() {
+  if (echo.state === 'listening') {
+    setState('ready');
+    setMsg('The mic is off — your progress is kept. Turn it back on and carry on.');
+  }
 }
 
 function onNote(ev) {
-  if (currentView !== 'echo' || echo.state !== 'listening') return;
-  const want = echo.phrase[echo.idx];
-  const hit = ev.midi === want.midi;
-  store.recordAttempt(want.midi, hit);
+  if (currentView !== 'echo') return;
   const ear = $('ear-only').checked;
-  const heard = midiToLetter(ev.midi);
-  const heardHoles = notesForMidi(ev.midi)
-    .map((n) => `hole ${n.hole} ${n.dir === 'blow' ? 'blow' : 'draw'}`)
-    .join(' or ');
+  const canPlay = echo.state === 'listening' || (echo.state === 'ready' && (echo.heard || !ear));
+  if (!canPlay) return;
+  if (echo.state === 'ready') setState('listening');
+
+  const i = echo.idx;
+  const want = echo.phrase[i];
+  const hit = ev.midi === want.midi;
+
+  if (!echo.attempted[i]) {            // first attempt on this note only
+    echo.attempted[i] = true;
+    store.recordAttempt(want.midi, hit);
+    refreshHeat();
+  }
 
   if (hit) {
-    stepEl(echo.idx)?.classList.add('done');
+    const el = stepEl(i);
+    el?.classList.remove('hint');
+    el?.classList.add('done');
     echo.idx++;
     if (echo.idx >= echo.phrase.length) {
-      echo.state = 'idle';
-      echo.done = true;
       store.bumpRounds();
+      setState('complete');
       setMsg(`That's the whole phrase. ${Math.abs(ev.cents) > 25 ? `Last note was ${centsWord(ev.cents)} — fine.` : 'Nicely played.'}`);
     } else {
       const tune = Math.abs(ev.cents) > 25 ? ` (${centsWord(ev.cents)})` : '';
-      setMsg(`${heard} — yes${tune}. Next one.`);
+      setState('listening');
+      setMsg(`${midiToLetter(ev.midi)} — yes${tune}. Next one.`);
     }
-    markNext();
+    return;
+  }
+
+  // Wrong note: stay on this note. Never reset.
+  echo.misses[i] = (echo.misses[i] || 0) + 1;
+  const heard = midiToLetter(ev.midi);
+  const heardHoles = notesForMidi(ev.midi)
+    .map((n) => `hole ${n.hole} ${n.dir}`)
+    .join(' or ');
+
+  if (echo.misses[i] >= HINT_AFTER) {
+    stepEl(i)?.classList.add('hint');
+    setMsg(`Here's a hint: it's ${want.letter}, ${want.where}. No rush.`);
   } else if (ev.midi % 12 === want.midi % 12) {
     const dir = ev.midi > want.midi ? 'higher' : 'lower';
-    setMsg(`Right letter, but that’s an octave ${dir}. Try ${ev.midi > want.midi ? 'further left' : 'further right'} on the map.`);
+    setMsg(`Sounds like the right letter, but an octave ${dir}. Try ${ev.midi > want.midi ? 'further left' : 'further right'} on the map.`);
   } else {
     setMsg(
       `I heard ${heard}${heardHoles ? ` (${heardHoles})` : ''}.` +
         (ear ? ' Not quite — try another.' : ` Looking for ${want.letter}. No rush.`)
     );
   }
-  refreshHeat();
-  updateEchoButtons();
 }
 
 // ---------- controls ----------
@@ -321,5 +411,6 @@ $('len-up').addEventListener('click', () => setLen(echo.len + 1));
 $('ear-only').addEventListener('change', () => $('phrase').classList.toggle('ear', $('ear-only').checked));
 $('btn-hear').addEventListener('click', hear);
 $('btn-new').addEventListener('click', newPhrase);
+$('btn-restart').addEventListener('click', startOver);
 
 newPhrase();
