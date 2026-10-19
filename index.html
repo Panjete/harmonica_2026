@@ -18,6 +18,7 @@
     <nav class="tabs" aria-label="Sections">
       <button class="tab active" data-view="play" id="tab-play">Play</button>
       <button class="tab" data-view="echo" id="tab-echo">Echo</button>
+      <button class="tab" data-view="guide" id="tab-guide">The Map &amp; Notes</button>
     </nav>
     <button class="mic-pill" id="mic-pill" type="button" aria-pressed="false">
       <i aria-hidden="true"></i><span id="mic-pill-text">mic off</span>
@@ -35,6 +36,7 @@
         <div class="note-big" id="note-big">—</div>
         <div class="readout-side">
           <div class="hole-text" id="hole-text">Press “Start listening” and play a note.</div>
+          <div class="note-role" id="note-role"></div>
 
           <div class="meter" aria-label="Pitch accuracy">
             <div class="meter-track"><span class="meter-tick"></span><i id="cents-dot"></i></div>
@@ -114,6 +116,99 @@
 
       <div id="harp-echo" aria-label="Harmonica map"></div>
       <p class="legend">Use headphones if you can, so the mic doesn't hear the speakers.</p>
+    </section>
+
+    <!-- ================= GUIDE: THE MAP & NOTES ================= -->
+    <section id="view-guide" class="view" hidden>
+      <h2 class="view-title">How notes work &amp; the map</h2>
+      <p class="lede">The underlying logic behind notes, octaves, letters A–G, and why your 10-hole harmonica is laid out this way.</p>
+
+      <div class="guide-grid">
+        <!-- Card 1: Sound is Frequency -->
+        <article class="guide-card">
+          <span class="guide-tag">The Physics</span>
+          <h3 class="guide-heading">1. Sound is just frequency</h3>
+          <p>Every musical note is a sound wave vibrating at a specific speed (frequency in Hertz):</p>
+          <ul class="guide-bullets">
+            <li><b>Slow vibrations (~260 Hz)</b> sound deep and low (Hole 1 on the left).</li>
+            <li><b>Fast vibrations (~2100 Hz)</b> sound crisp and high (Hole 10 on the right).</li>
+          </ul>
+          <p>Your ear hears pitch <b>logarithmically</b>: whenever frequency doubles (e.g. 261 Hz → 523 Hz), your brain perceives it as the <em>same note</em>, just in a higher register. That doubling distance is called an <b>Octave</b>.</p>
+        </article>
+
+        <!-- Card 2: The 7-Letter Alphabet -->
+        <article class="guide-card">
+          <span class="guide-tag">The Alphabet</span>
+          <h3 class="guide-heading">2. The 7 repeating letters</h3>
+          <p>Western music took that frequency doubling and divided it into 7 primary steps, named alphabetically in an endless loop (tap any note to hear it):</p>
+          <div class="scale-visual" id="guide-scale" aria-label="C major scale">
+            <button type="button" class="sv-note sv-c" data-midi="72" title="C5 · Hole 4 Blow (Home/Root)">C</button>
+            <span class="sv-arrow">→</span>
+            <button type="button" class="sv-note" data-midi="74" title="D5 · Hole 4 Draw (Step 2)">D</button>
+            <span class="sv-arrow">→</span>
+            <button type="button" class="sv-note sv-c" data-midi="76" title="E5 · Hole 5 Blow (Step 3)">E</button>
+            <span class="sv-arrow">→</span>
+            <button type="button" class="sv-note" data-midi="77" title="F5 · Hole 5 Draw (Step 4)">F</button>
+            <span class="sv-arrow">→</span>
+            <button type="button" class="sv-note sv-c" data-midi="79" title="G5 · Hole 6 Blow (Step 5)">G</button>
+            <span class="sv-arrow">→</span>
+            <button type="button" class="sv-note" data-midi="81" title="A5 · Hole 6 Draw (Step 6)">A</button>
+            <span class="sv-arrow">→</span>
+            <button type="button" class="sv-note" data-midi="83" title="B5 · Hole 7 Draw (Step 7)">B</button>
+            <span class="sv-arrow">→</span>
+            <button type="button" class="sv-note sv-c" data-midi="84" title="C6 · Hole 7 Blow (Octave / Home)">C…</button>
+          </div>
+          <p>Think of it as a circular buffer: after <b>G</b>, it loops back to <b>A</b> at a higher frequency. The highlighted notes (<b>C, E, G</b>) are your <b>blow notes</b>.</p>
+        </article>
+
+        <!-- Card 3: Why C? -->
+        <article class="guide-card">
+          <span class="guide-tag">The Math</span>
+          <h3 class="guide-heading">3. Why is it a “C” Harmonica?</h3>
+          <p>The universal cheerful melody pattern (the <em>Major Scale</em>: “Do Re Mi Fa Sol La Ti Do”) requires specific mathematical step sizes. If you start on <b>C</b>, all 7 steps land precisely on <b>clean alphabet letters with zero sharps (♯) or flats (♭)</b>.</p>
+          <p>Your C harmonica only contains these exact natural notes. <b>There are no “wrong” keys inside.</b> Every hole you blow or draw belongs to the C major family.</p>
+        </article>
+
+        <!-- Card 4: The 3 Zones -->
+        <article class="guide-card span-2">
+          <span class="guide-tag">Instrument Anatomy</span>
+          <h3 class="guide-heading">4. The 3 zones of your 10 holes</h3>
+          <div class="zones-grid">
+            <div class="zone-box">
+              <span class="zone-badge">Holes 1 – 3</span>
+              <h4>The Rhythm Engine</h4>
+              <p>Designed for chords. Blowing gives <b>C – E – G</b> (the home C chord). Drawing gives <b>D – G – B</b> (the walking G chord). Used for chugging train rhythms.</p>
+            </div>
+            <div class="zone-box primary-zone">
+              <span class="zone-badge highlight">Holes 4 – 7</span>
+              <h4>The Complete Melody Scale</h4>
+              <p>Contains the entire 8-note Do-Re-Mi scale in order: <b>4 blow (C), 4 draw (D), 5 blow (E), 5 draw (F), 6 blow (G), 6 draw (A), 7 draw (B), 7 blow (C)</b>. Almost all familiar songs live right here.</p>
+            </div>
+            <div class="zone-box">
+              <span class="zone-badge">Holes 8 – 10</span>
+              <h4>The High Register</h4>
+              <p>Higher octave repeats of the scale for bright accents, folk whistles, and soaring lead solos.</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- Card 5: Breath Logic -->
+        <article class="guide-card span-2">
+          <span class="guide-tag">The Physics of Breath</span>
+          <h3 class="guide-heading">5. Breathing in vs Breathing out</h3>
+          <p>Unlike a piano or guitar where you pluck or strike, the harmonica is an acoustic extension of your lungs:</p>
+          <div class="breath-comparison">
+            <div class="breath-card blow">
+              <div class="bc-title"><span class="dot blow"></span> <b>Blow (Exhale)</b></div>
+              <p>Every single blow hole produces a note from the <b>C Major Chord (C, E, or G)</b>. It sounds peaceful, grounded, and feels like "home".</p>
+            </div>
+            <div class="breath-card draw">
+              <div class="bc-title"><span class="dot draw"></span> <b>Draw (Inhale)</b></div>
+              <p>Draw notes produce the intermediate walking steps (<b>D, F, A, B</b>). They feel active, longing, and want to resolve back to a blow note.</p>
+            </div>
+          </div>
+        </article>
+      </div>
     </section>
   </main>
 

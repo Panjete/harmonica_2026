@@ -42,3 +42,25 @@ export const notesForMidi = (m, holes = null) =>
 
 /** Harmonica tab: blow = "4", draw = "−4". */
 export const tab = (n) => (n.dir === 'draw' ? '−' : '') + n.hole;
+
+/** Beginner music theory metadata for the diatonic C scale */
+export const SOLFEGE = {
+  'C': { syllable: 'Do', role: 'Root (Home)', family: 'C Major Chord (Blow)' },
+  'D': { syllable: 'Re', role: 'Step 2 (Passing)', family: 'Inhale Note (Draw)' },
+  'E': { syllable: 'Mi', role: 'Step 3 (Sweet harmony)', family: 'C Major Chord (Blow)' },
+  'F': { syllable: 'Fa', role: 'Step 4 (Subdominant)', family: 'Inhale Note (Draw)' },
+  'G': { syllable: 'Sol', role: 'Step 5 (Anchor harmony)', family: 'C Major Chord (Blow)' },
+  'A': { syllable: 'La', role: 'Step 6 (Folk resting)', family: 'Inhale Note (Draw)' },
+  'B': { syllable: 'Ti', role: 'Step 7 (Leading tone)', family: 'Inhale Note (Draw)' },
+};
+
+/** Get beginner-friendly musical context for any MIDI note */
+export function getNoteRole(midi) {
+  const letter = midiToLetter(midi);
+  const info = SOLFEGE[letter] || { syllable: '', role: 'Note', family: '' };
+  const oct = Math.floor(midi / 12) - 1;
+  const freq = Math.round(midiToFreq(midi));
+  const reg = oct <= 4 ? 'Low register' : oct === 5 ? 'Melody register' : 'High register';
+  return { letter, ...info, oct, freq, reg };
+}
+

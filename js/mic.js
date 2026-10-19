@@ -145,8 +145,10 @@ export class Listener {
     }
     this.centsAcc.push(f.cents);
 
-    // Can register if it's a new pitch, or after 450ms of holding (re-trigger)
-    const canRegister = (this.registered !== f.midi) || (now - this.registeredTime >= 450);
+    // Can register if it's a new pitch (e.g. sliding or changing breath),
+    // or if the previous note was released with silence/articulation (this.registered === null).
+    // A sustained continuous breath on the same hole does not fire duplicate notes.
+    const canRegister = (this.registered !== f.midi);
     if (now - this.candSince >= HOLD_MS && canRegister) {
       this.registered = f.midi;
       this.registeredTime = now;

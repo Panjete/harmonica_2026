@@ -129,8 +129,22 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
 .readout[data-state='live'][data-dir='both'] .note-big { color: var(--amber); }
 .readout[data-state='live'][data-dir='off'] .note-big { color: var(--dim); }
 
-.hole-text { font-size: 1.25rem; color: var(--dim); margin-bottom: 1.4rem; min-height: 1.6em; }
+.hole-text { font-size: 1.25rem; color: var(--dim); margin-bottom: .6rem; min-height: 1.6em; }
 .readout[data-state='live'] .hole-text { color: var(--text); }
+
+.note-role {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem .8rem;
+  font-size: .88rem;
+  color: var(--dim);
+  margin-bottom: 1.2rem;
+  min-height: 1.4rem;
+}
+.note-role .solfege { color: var(--amber); font-weight: 600; }
+.note-role .freq { color: var(--faint); font-variant-numeric: tabular-nums; }
+.note-role .family { color: var(--text); }
+.note-role .reg { color: var(--dim); font-size: .82rem; }
 
 .meter { margin-bottom: 1.1rem; }
 .meter-track { position: relative; height: 8px; background: var(--surface-2); border-radius: 99px; }
@@ -236,6 +250,16 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
   border-color: var(--c);
   box-shadow: 0 0 36px color-mix(in srgb, var(--c) 32%, transparent);
 }
+.cell.cue {
+  border-color: var(--amber) !important;
+  background: color-mix(in srgb, var(--amber) 22%, var(--surface)) !important;
+  box-shadow: 0 0 28px color-mix(in srgb, var(--amber) 40%, transparent) !important;
+  animation: cue-pulse 1.8s ease-in-out infinite;
+}
+@keyframes cue-pulse {
+  0%, 100% { transform: scale(1); border-color: var(--amber); }
+  50% { transform: scale(1.05); border-color: color-mix(in srgb, var(--amber) 80%, white); }
+}
 
 .legend { margin: 1.4rem 0 0; font-size: .85rem; color: var(--dim); display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
 .legend .dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: -.4rem; }
@@ -330,6 +354,177 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
 .echo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.4rem; margin-bottom: 2rem; }
 .rounds { font-size: .85rem; color: var(--faint); margin-left: auto; }
 
+/* ---------- guide: the map & notes ---------- */
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.4rem;
+  margin-top: 1.2rem;
+}
+.guide-card {
+  background: linear-gradient(180deg, var(--surface), var(--bg-2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.6rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .2);
+}
+.guide-card.span-2 {
+  grid-column: 1 / -1;
+}
+.guide-tag {
+  align-self: flex-start;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--blow);
+  background: color-mix(in srgb, var(--blow) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--blow) 28%, transparent);
+  padding: .2rem .75rem;
+  border-radius: 999px;
+}
+.guide-heading {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 1.45rem;
+  color: var(--text);
+  font-variation-settings: 'SOFT' 100;
+}
+.guide-bullets {
+  margin: .2rem 0;
+  padding-left: 1.2rem;
+  color: var(--dim);
+}
+.guide-bullets li {
+  margin-bottom: .4rem;
+}
+
+/* 7-note visualizer with audio preview */
+.scale-visual {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .6rem;
+  margin: .6rem 0;
+  padding: .8rem 1rem;
+  background: var(--surface-2);
+  border-radius: 14px;
+  border: 1px solid var(--line);
+}
+.sv-note {
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 500;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform .2s var(--ease), background .2s var(--ease), border-color .2s;
+}
+.sv-note:hover {
+  transform: translateY(-2px);
+  border-color: var(--faint);
+  background: var(--line);
+}
+.sv-note.sv-c {
+  color: var(--blow);
+  border-color: color-mix(in srgb, var(--blow) 40%, var(--line));
+  background: color-mix(in srgb, var(--blow) 12%, var(--surface));
+}
+.sv-note.sv-c:hover {
+  border-color: var(--blow);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--blow) 35%, transparent);
+}
+.sv-arrow {
+  color: var(--faint);
+  font-size: .9rem;
+}
+
+/* The 3 zones */
+.zones-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: .4rem;
+}
+.zone-box {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.zone-box.primary-zone {
+  border-color: color-mix(in srgb, var(--amber) 50%, var(--line));
+  background: color-mix(in srgb, var(--amber) 6%, var(--surface-2));
+  box-shadow: 0 0 30px color-mix(in srgb, var(--amber) 12%, transparent);
+}
+.zone-badge {
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+.zone-badge.highlight {
+  color: var(--amber);
+}
+.zone-box h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.zone-box p {
+  margin: 0;
+  font-size: .88rem;
+  color: var(--dim);
+  line-height: 1.5;
+}
+
+/* Breath comparison (Blow vs Draw) */
+.breath-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-top: .4rem;
+}
+.breath-card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.2rem 1.4rem;
+}
+.breath-card.blow {
+  border-left: 4px solid var(--blow);
+}
+.breath-card.draw {
+  border-left: 4px solid var(--draw);
+}
+.bc-title {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  font-size: 1.05rem;
+  margin-bottom: .4rem;
+}
+.breath-card p {
+  margin: 0;
+  font-size: .9rem;
+  color: var(--dim);
+}
+
 /* ---------- motion ---------- */
 @keyframes breathe { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
@@ -343,4 +538,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
   .readout { grid-template-columns: 1fr; gap: 1rem; padding: 1.4rem; }
   .harp { padding: .9rem; }
   .cell { padding: .7rem 0 .6rem; border-radius: 10px; }
+  .guide-grid { grid-template-columns: 1fr; }
+  .zones-grid { grid-template-columns: 1fr; }
+  .breath-comparison { grid-template-columns: 1fr; }
 }

@@ -1,4 +1,4 @@
-import { ALL_NOTES, midiToLetter, notesForMidi, tab, setRefA4 } from './notes.js';
+import { ALL_NOTES, midiToLetter, notesForMidi, tab, setRefA4, getNoteRole } from './notes.js';
 import { Listener } from './mic.js';
 import { playNote } from './synth.js';
 import { createHarp } from './harp.js';
@@ -99,6 +99,13 @@ function show(f) {
   $('cents-dot').style.left = `${50 + Math.max(-50, Math.min(50, f.cents))}%`;
   $('cents-word').textContent = centsWord(f.cents);
   $('steady-fill').style.width = `${Math.max(0, Math.min(1, (f.clarity - 0.8) / 0.19)) * 100}%`;
+
+  const role = getNoteRole(f.midi);
+  const roleEl = $('note-role');
+  if (roleEl) {
+    roleEl.innerHTML = `<span class="solfege">${role.syllable} (${role.role})</span> · <span class="freq">~${role.freq} Hz</span> · <span class="family">${role.family}</span> · <span class="reg">${role.reg}</span>`;
+  }
+
   harps.forEach((h) => h.setLive(f.midi));
 }
 
@@ -106,6 +113,8 @@ function clearReadout() {
   readout.dataset.state = 'idle';
   delete readout.dataset.dir;
   $('note-big').textContent = '—';
+  const roleEl = $('note-role');
+  if (roleEl) roleEl.textContent = '';
   if (performance.now() >= unclearHoldUntil) {
     $('hole-text').textContent = mic.running ? 'Listening… play a note.' : 'Press “Start listening” and play a note.';
   }
@@ -367,59 +376,92 @@ function onNote(ev) {
     refreshHeat();
   }
 
-  // Always re-arm the mic listener so the user can immediately play the next or retry note
-  mic.resetRegistered();
-
   if (hit) {
+    // Clear mistake visual cue on harmonica map
+    harpEcho.cue(null);
+
+    // Re-arm listener so that if the NEXT note in the phrase is the same pitch,
+    // the user's re-attack (tongue or breath release) will cleanly trigger the next step
+    mic.resetRegistered();
+
     const el = stepEl(i);
     el?.classList.remove('hint', 'miss');
     el?.classList.add('done');
+    const wasRecovery = (echo.misses[i] || 0) > 0;
     echo.idx++;
+
     if (echo.idx >= echo.phrase.length) {
       store.bumpRounds();
       setState('complete');
-      setMsg(`That's the whole phrase. ${Math.abs(ev.cents) > 25 ? `Last note was ${centsWord(ev.cents)} — fine.` : 'Nicely played.'}`);
+      setMsg(`That's the whole phrase! ${Math.abs(ev.cents) > 25 ? `Last note was ${centsWord(ev.cents)} — great.` : 'Beautifully played.'}`);
     } else {
       const tune = Math.abs(ev.cents) > 25 ? ` (${centsWord(ev.cents)})` : '';
       setState('listening');
-      setMsg(`${midiToLetter(ev.midi)} — yes${tune}. Next one.`);
+      setMsg(wasRecovery
+        ? `Recovered! Found ${want.letter} (${want.where})${tune}. Next one!`
+        : `${midiToLetter(ev.midi)} — yes${tune}. Next one.`);
     }
     return;
   }
 
   // Wrong note:
+  // Note: we do NOT call mic.resetRegistered() here!
+  // Keeping registered set to ev.midi ensures that holding this continuous wrong breath
+  // will NOT spam multiple miss events. A new miss event will only fire if the user
+  // slides to a different hole or releases breath and blows again.
   echo.misses[i] = (echo.misses[i] || 0) + 1;
   const heard = midiToLetter(ev.midi);
   const heardHoles = notesForMidi(ev.midi)
     .map((n) => `hole ${n.hole} ${n.dir}`)
     .join(' or ');
 
+  // Gently pulse the target hole on the harmonica map so the user knows where to slide
+  harpEcho.cue(want.id);
+
   const resetOnMiss = $('reset-on-miss')?.checked;
+  const dirGuide = ev.midi < want.midi ? 'slide right' : 'slide left';
+
   if (resetOnMiss) {
     const el = stepEl(i);
     el?.classList.add('miss');
     setTimeout(() => el?.classList.remove('miss'), 500);
-    setMsg(`Heard ${heard}${heardHoles ? ` (${heardHoles})` : ''} instead of ${want.letter}. Resetting phrase to note 1 — let’s try it again!`);
+
+    // Give 3 distinct attempts with patience before wiping progress
+    const attemptsLeft = 3 - echo.misses[i];
+    if (attemptsLeft > 0) {
+      setMsg(`Heard ${heard}${heardHoles ? ` (${heardHoles})` : ''} — looking for ${want.letter} (${want.where}). Try to ${dirGuide}! (${attemptsLeft} attempt${attemptsLeft > 1 ? 's' : ''} left before reset)`);
+      return;
+    }
+
+    setMsg(`Heard ${heard}. Resetting phrase to note 1 — let’s build momentum together!`);
     echo.idx = 0;
     clearMarks();
+    harpEcho.cue(null);
     refreshEchoUI();
     return;
   }
 
-  // If "Reset on mistake" is unchecked: wait on current note
+  // If "Reset on mistake" is unchecked: remain at status quo with helpful guidance
   if (echo.misses[i] >= HINT_AFTER) {
     stepEl(i)?.classList.add('hint');
-    setMsg(`Here's a hint: it's ${want.letter}, ${want.where}. No rush.`);
+    setMsg(`Here's a hint: it's ${want.letter}, ${want.where}. Try to ${dirGuide}.`);
   } else if (ev.midi % 12 === want.midi % 12) {
     const dir = ev.midi > want.midi ? 'higher' : 'lower';
-    setMsg(`Sounds like the right letter, but an octave ${dir}. Try ${ev.midi > want.midi ? 'further left' : 'further right'} on the map.`);
+    setMsg(`Right letter (${heard}), but an octave ${dir}. Try ${ev.midi > want.midi ? 'further left' : 'further right'} on the map.`);
   } else {
     setMsg(
-      `I heard ${heard}${heardHoles ? ` (${heardHoles})` : ''}.` +
-        (ear ? ' Not quite — try another.' : ` Looking for ${want.letter}. No rush.`)
+      `Heard ${heard}${heardHoles ? ` (${heardHoles})` : ''}.` +
+        (ear ? ` Not quite — try to ${dirGuide}.` : ` Looking for ${want.letter} (${want.where}). Try to ${dirGuide}.`)
     );
   }
 }
+
+// Click to play audio on guide scale preview
+$('guide-scale')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-midi]');
+  if (!btn) return;
+  playNote(+btn.dataset.midi, { dur: 0.8 });
+});
 
 // ---------- controls ----------
 $('pool-seg').innerHTML = Object.entries(POOLS)

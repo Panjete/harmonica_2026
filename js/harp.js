@@ -44,6 +44,10 @@ export function createHarp(root, { onPress } = {}) {
       const el = cells.find((c) => c.dataset.id === id);
       if (el) flashEl(el, ms);
     },
+    /** Soft visual cue on a specific hole (e.g. to guide the player after a miss). Pass null to clear. */
+    cue(id) {
+      for (const c of cells) c.classList.toggle('cue', id != null && c.dataset.id === id);
+    },
     /** stats: { [midi]: {tries, hits} } — shows a thin bar once a note has 3+ attempts. */
     setHeat(stats) {
       for (const c of cells) {
