@@ -308,18 +308,83 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
 .phrase { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0 0 1.2rem; min-height: 8rem; }
 .step {
   --c: var(--blow);
-  min-width: 6.8rem; padding: 1.1rem 1.4rem; text-align: center;
+  position: relative;
+  min-width: 6.8rem; padding: 1.1rem 1.3rem; text-align: center;
   background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
-  transition: background .4s var(--ease), border-color .4s var(--ease), box-shadow .5s var(--ease);
+  transition: background .3s var(--ease), border-color .3s var(--ease), box-shadow .3s var(--ease), transform .2s var(--ease);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 .step[data-dir='draw'] { --c: var(--draw); }
 .step[data-dir='both'] { --c: var(--amber); }
-.step .sn { display: block; font-family: var(--display); font-weight: 350; font-size: 3rem; line-height: 1.1; font-variation-settings: 'SOFT' 100; }
+.step .sn { display: block; font-family: var(--display); font-weight: 350; font-size: 2.8rem; line-height: 1.1; font-variation-settings: 'SOFT' 100; }
 .step .st { display: block; font-size: .85rem; letter-spacing: .08em; color: var(--dim); }
+
+/* Note duration variations & rhythm badges */
+.step.dur-quick {
+  min-width: 5.4rem;
+  padding: .85rem .9rem;
+  border-style: dashed;
+}
+.step.dur-quick .sn { font-size: 2.2rem; }
+.step.dur-short {
+  min-width: 6.2rem;
+  padding: .95rem 1.1rem;
+}
+.step.dur-short .sn { font-size: 2.5rem; }
+.step.dur-beat {
+  min-width: 7.0rem;
+}
+.step.dur-med {
+  min-width: 8.0rem;
+}
+.step.dur-hold,
+.step.dur-long {
+  min-width: 9.6rem;
+  background: linear-gradient(180deg, var(--surface), color-mix(in srgb, var(--surface-2) 80%, transparent));
+  border-color: color-mix(in srgb, var(--line) 85%, var(--c));
+}
+
+.dur-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  margin-top: .45rem;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  padding: .2rem .65rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--dim);
+  text-transform: none;
+  white-space: nowrap;
+}
+.dur-pill.dur-quick {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--amber) 30%, transparent);
+}
+.dur-pill.dur-short {
+  color: #7dd3fc;
+  background: color-mix(in srgb, #7dd3fc 12%, var(--surface-2));
+  border-color: color-mix(in srgb, #7dd3fc 30%, transparent);
+}
+.dur-pill.dur-hold,
+.dur-pill.dur-long {
+  color: var(--blow);
+  background: color-mix(in srgb, var(--blow) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--blow) 30%, transparent);
+}
+
 .step.playing {
   border-color: var(--c);
   background: color-mix(in srgb, var(--c) 18%, var(--surface));
-  box-shadow: 0 0 40px color-mix(in srgb, var(--c) 28%, transparent);
+  box-shadow: 0 0 40px color-mix(in srgb, var(--c) 35%, transparent);
+  transform: translateY(-2px);
 }
 .step.next { border-color: color-mix(in srgb, var(--c) 55%, var(--line)); animation: breathe 3.2s ease-in-out infinite; }
 .step.done { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); animation: none; }

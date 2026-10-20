@@ -1,9 +1,9 @@
 import { ALL_NOTES, HOLES, midiToLetter, notesForMidi, tab, setRefA4, getNoteRole } from './notes.js';
 import { Listener } from './mic.js';
-import { playNote, playMelody, stopMelody } from './synth.js';
+import { playNote, playMelody, stopMelody } from './synth.js?v=2';
 import { createHarp } from './harp.js';
 import * as store from './store.js';
-import { SONGS, getSongById } from './songs.js';
+import { SONGS, getSongById, getRhythmMeta } from './songs.js?v=2';
 
 const $ = (id) => document.getElementById(id);
 
@@ -631,9 +631,10 @@ function toggleFullSongPreview(song) {
   const allNotes = song.phrases.flatMap((p) => p.notes);
   playMelody(allNotes, {
     bpm: song.bpm,
-    onNote: (i, note) => {
+    onNote: (i, note, durSec) => {
       harps.forEach((h) => h.setLive(note.midi));
-      setTimeout(() => harps.forEach((h) => h.setLive(null)), 240);
+      const holdMs = Math.max(70, Math.min(durSec * 1000 - 20, 1600));
+      setTimeout(() => harps.forEach((h) => h.setLive(null)), holdMs);
     },
     onEnd: () => {
       currentPreviewSongId = null;
@@ -722,7 +723,7 @@ function loadSongPhrase(idx) {
   $('song-phrase-badge').className = `phrase-badge ${isDone ? 'mastered' : ''}`;
 
   $('btn-song-next-phrase').hidden = true;
-  $('song-practice-msg').textContent = 'Press “Hear phrase” to listen, then play it back on your harmonica.';
+  $('song-practice-msg').textContent = 'Press “Hear phrase” to listen to the rhythm and melody, then play it back on your harmonica.';
 
   renderPhraseSteps(phrase.notes);
   renderPhraseStepper();
@@ -731,12 +732,16 @@ function loadSongPhrase(idx) {
 function renderPhraseSteps(notes) {
   const container = $('song-phrase-steps');
   if (!container) return;
-  container.innerHTML = notes.map((n, i) => `
-    <div class="step" data-dir="${n.dir}" data-idx="${i}">
-      <span class="sn">${midiToLetter(n.midi)}</span>
-      <span class="st">${n.tab} ${n.dir}</span>
-    </div>
-  `).join('');
+  container.innerHTML = notes.map((n, i) => {
+    const meta = getRhythmMeta(n.beats || 1);
+    return `
+      <div class="step ${meta.cls}" data-dir="${n.dir}" data-idx="${i}" data-beats="${n.beats || 1}" title="${n.tab} (${n.dir}) — ${meta.label}">
+        <span class="sn">${midiToLetter(n.midi)}</span>
+        <span class="st">${n.tab} ${n.dir}</span>
+        <span class="dur-pill ${meta.cls}">${meta.label}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 async function hearSongPhrase() {
@@ -747,7 +752,7 @@ async function hearSongPhrase() {
   const phrase = activeSong.phrases[activePhraseIdx];
   songPhraseNoteIdx = 0;
   songPracticeState = 'playing';
-  $('song-practice-msg').textContent = 'Listen…';
+  $('song-practice-msg').textContent = 'Listen to the rhythm and phrasing…';
 
   const stepEls = $('song-phrase-steps').querySelectorAll('.step');
   stepEls.forEach((el) => el.classList.remove('done', 'miss', 'playing'));
@@ -760,9 +765,17 @@ async function hearSongPhrase() {
 
   playMelody(phrase.notes, {
     bpm: activeSong.bpm,
-    onNote: (i, note) => {
-      stepEls.forEach((el, idx) => el.classList.toggle('playing', idx === i));
-      harpSong.flash(`${note.hole}${note.dir}`, 350);
+    onNote: (i, note, durSec) => {
+      stepEls.forEach((el, idx) => {
+        if (idx === i) {
+          el.classList.add('playing');
+          const offMs = Math.max(70, durSec * 1000 - 25);
+          setTimeout(() => el.classList.remove('playing'), offMs);
+        } else {
+          el.classList.remove('playing');
+        }
+      });
+      harpSong.flash(`${note.hole}${note.dir}`, Math.max(90, Math.min(durSec * 1000, 1600)));
     },
     onEnd: () => {
       stepEls.forEach((el) => el.classList.remove('playing'));
