@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..600,0..100&family=Manrope:wght@300..700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=2">
+  <link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
   <header class="top">
@@ -116,23 +116,56 @@
         <!-- Phrase Stepper Tabs -->
         <div class="phrase-stepper" id="song-phrase-stepper"></div>
 
-        <!-- Phrase Active Area -->
-        <div class="phrase-active-card">
-          <div class="phrase-info-bar">
-            <h4 id="song-phrase-label">Phrase 1</h4>
-            <span class="phrase-badge" id="song-phrase-badge">Not started</span>
+        <!-- Compact Interactive Practice Console: Sequence Deck + Live Identifier & Map -->
+        <div class="practice-console">
+          <!-- LEFT: The Sequence of Moves -->
+          <div class="phrase-active-card">
+            <div class="phrase-info-bar">
+              <div class="phrase-label-group">
+                <h4 id="song-phrase-label">Phrase 1</h4>
+                <span class="phrase-seq-counter" id="phrase-seq-counter">0 / 0</span>
+              </div>
+              <span class="phrase-badge" id="song-phrase-badge">In progress</span>
+            </div>
+
+            <!-- The Sequence of Step Cards -->
+            <div class="phrase compact-sequence" id="song-phrase-steps"></div>
+
+            <p class="echo-msg" id="song-practice-msg">Press “Hear phrase” to listen, then play through the sequence on your harmonica.</p>
+
+            <div class="song-actions">
+              <button class="btn primary" id="btn-song-hear-phrase" type="button">▶ Hear phrase</button>
+              <button class="btn" id="btn-song-restart-phrase" type="button" title="Start sequence from note 1">↺ Replay sequence</button>
+              <button class="btn" id="btn-song-next-phrase" type="button" hidden>Next phrase →</button>
+              <span class="status" id="song-mic-status" aria-live="polite"></span>
+            </div>
           </div>
-          <div class="phrase" id="song-phrase-steps"></div>
-          <p class="echo-msg" id="song-practice-msg">Press “Hear phrase” to listen, then play it on your harmonica.</p>
-          <div class="song-actions">
-            <button class="btn primary" id="btn-song-hear-phrase" type="button">Hear phrase</button>
-            <button class="btn" id="btn-song-next-phrase" type="button" hidden>Next phrase →</button>
-            <span class="status" id="song-mic-status" aria-live="polite"></span>
+
+          <!-- RIGHT: Live Note Identifier & Compact Harmonica Map -->
+          <div class="practice-companion">
+            <!-- Live Note Identifier Strip -->
+            <div class="song-live-identifier" id="song-readout" data-state="idle">
+              <div class="sli-badge-col">
+                <span class="sli-tab-badge" id="song-tab-badge">—</span>
+                <span class="sli-note-name" id="song-note-name">Waiting for note</span>
+              </div>
+              <div class="sli-details-col">
+                <div class="sli-meter" aria-label="Pitch accuracy">
+                  <div class="meter-track"><span class="meter-tick"></span><i id="song-cents-dot"></i></div>
+                  <div class="sli-meter-labels"><span>flat</span><span id="song-cents-word">&nbsp;</span><span>sharp</span></div>
+                </div>
+                <div class="sli-steady">
+                  <span class="sli-steady-label">steadiness</span>
+                  <div class="steady-track"><i id="song-steady-fill"></i></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Compact Harmonica Map -->
+            <div id="harp-song" class="compact-harp" aria-label="Harmonica map"></div>
+            <p class="legend-compact">Tabs: <b>4</b> = blow · <b>−4</b> = draw</p>
           </div>
         </div>
-
-        <div id="harp-song" aria-label="Harmonica map"></div>
-        <p class="legend">Tabs: <b>4</b> means blow into hole 4. <b>−4</b> means draw (inhale) on hole 4.</p>
       </div>
 
       <!-- SONG CARDS GRID (Visible when browsing) -->
@@ -259,21 +292,21 @@
           <h3 class="guide-heading">2. The 7 repeating letters</h3>
           <p>Western music took that frequency doubling and divided it into 7 primary steps, named alphabetically in an endless loop (tap any note to hear it):</p>
           <div class="scale-visual" id="guide-scale" aria-label="C major scale">
-            <button type="button" class="sv-note sv-c" data-midi="72" title="C5 · Hole 4 Blow (Home/Root)">C</button>
+            <button type="button" class="sv-note sv-c" data-midi="72" title="C5 · Tab 4 (Home/Root)">C</button>
             <span class="sv-arrow">→</span>
-            <button type="button" class="sv-note" data-midi="74" title="D5 · Hole 4 Draw (Step 2)">D</button>
+            <button type="button" class="sv-note" data-midi="74" title="D5 · Tab −4 (Step 2)">D</button>
             <span class="sv-arrow">→</span>
-            <button type="button" class="sv-note sv-c" data-midi="76" title="E5 · Hole 5 Blow (Step 3)">E</button>
+            <button type="button" class="sv-note sv-c" data-midi="76" title="E5 · Tab 5 (Step 3)">E</button>
             <span class="sv-arrow">→</span>
-            <button type="button" class="sv-note" data-midi="77" title="F5 · Hole 5 Draw (Step 4)">F</button>
+            <button type="button" class="sv-note" data-midi="77" title="F5 · Tab −5 (Step 4)">F</button>
             <span class="sv-arrow">→</span>
-            <button type="button" class="sv-note sv-c" data-midi="79" title="G5 · Hole 6 Blow (Step 5)">G</button>
+            <button type="button" class="sv-note sv-c" data-midi="79" title="G5 · Tab 6 (Step 5)">G</button>
             <span class="sv-arrow">→</span>
-            <button type="button" class="sv-note" data-midi="81" title="A5 · Hole 6 Draw (Step 6)">A</button>
+            <button type="button" class="sv-note" data-midi="81" title="A5 · Tab −6 (Step 6)">A</button>
             <span class="sv-arrow">→</span>
-            <button type="button" class="sv-note" data-midi="83" title="B5 · Hole 7 Draw (Step 7)">B</button>
+            <button type="button" class="sv-note" data-midi="83" title="B5 · Tab −7 (Step 7)">B</button>
             <span class="sv-arrow">→</span>
-            <button type="button" class="sv-note sv-c" data-midi="84" title="C6 · Hole 7 Blow (Octave / Home)">C…</button>
+            <button type="button" class="sv-note sv-c" data-midi="84" title="C6 · Tab 7 (Octave / Home)">C…</button>
           </div>
           <p>Think of it as a circular buffer: after <b>G</b>, it loops back to <b>A</b> at a higher frequency. The highlighted notes (<b>C, E, G</b>) are your <b>blow notes</b>.</p>
         </article>
@@ -299,7 +332,7 @@
             <div class="zone-box primary-zone">
               <span class="zone-badge highlight">Holes 4 – 7</span>
               <h4>The Complete Melody Scale</h4>
-              <p>Contains the entire 8-note Do-Re-Mi scale in order: <b>4 blow (C), 4 draw (D), 5 blow (E), 5 draw (F), 6 blow (G), 6 draw (A), 7 draw (B), 7 blow (C)</b>. Almost all familiar songs live right here.</p>
+              <p>Contains the entire 8-note Do-Re-Mi scale in order: <b>4 (C), −4 (D), 5 (E), −5 (F), 6 (G), −6 (A), −7 (B), 7 (C)</b>. Almost all familiar songs live right here.</p>
             </div>
             <div class="zone-box">
               <span class="zone-badge">Holes 8 – 10</span>
@@ -329,6 +362,6 @@
     </section>
   </main>
 
-  <script type="module" src="js/app.js?v=2"></script>
+  <script type="module" src="js/app.js?v=3"></script>
 </body>
 </html>

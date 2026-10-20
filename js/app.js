@@ -99,23 +99,66 @@ function onFrame(f) {
 function show(f) {
   const matches = notesForMidi(f.midi);
   const dirs = new Set(matches.map((n) => n.dir));
-  readout.dataset.state = 'live';
-  readout.dataset.dir = !matches.length ? 'off' : dirs.size > 1 ? 'both' : [...dirs][0];
-  readout.dataset.tuned = Math.abs(f.cents) <= 12;
+  const dirState = !matches.length ? 'off' : dirs.size > 1 ? 'both' : [...dirs][0];
+  const isTuned = Math.abs(f.cents) <= 12;
 
-  $('note-big').textContent = midiToLetter(f.midi);
-  $('hole-text').textContent = matches.length
-    ? matches.map((n) => `hole ${n.hole} · ${n.dir === 'blow' ? 'blow (out)' : 'draw (in)'}`).join('   or   ')
-    : 'Not on the map — a bend, or between two notes.';
+  // Update Play view readout
+  if (readout) {
+    readout.dataset.state = 'live';
+    readout.dataset.dir = dirState;
+    readout.dataset.tuned = isTuned;
+  }
+  const noteLetter = midiToLetter(f.midi);
+  const letterEl = $('note-big');
+  if (letterEl) letterEl.textContent = noteLetter;
 
-  $('cents-dot').style.left = `${50 + Math.max(-50, Math.min(50, f.cents))}%`;
-  $('cents-word').textContent = centsWord(f.cents);
-  $('steady-fill').style.width = `${Math.max(0, Math.min(1, (f.clarity - 0.8) / 0.19)) * 100}%`;
+  const tabText = matches.length
+    ? matches.map((n) => `tab ${n.dir === 'draw' ? '−' : ''}${n.hole}`).join('   or   ')
+    : 'Not on the standard map — a bend or transition tone.';
+  const holeTextEl = $('hole-text');
+  if (holeTextEl) holeTextEl.textContent = tabText;
+
+  const centsDot = $('cents-dot');
+  if (centsDot) centsDot.style.left = `${50 + Math.max(-50, Math.min(50, f.cents))}%`;
+  const centsWordEl = $('cents-word');
+  if (centsWordEl) centsWordEl.textContent = centsWord(f.cents);
+  const steadyFill = $('steady-fill');
+  if (steadyFill) steadyFill.style.width = `${Math.max(0, Math.min(1, (f.clarity - 0.8) / 0.19)) * 100}%`;
 
   const role = getNoteRole(f.midi);
   const roleEl = $('note-role');
   if (roleEl) {
     roleEl.innerHTML = `<span class="solfege">${role.syllable} (${role.role})</span> · <span class="freq">~${role.freq} Hz</span> · <span class="family">${role.family}</span> · <span class="reg">${role.reg}</span>`;
+  }
+
+  // Update Song Practice Live Identifier strip
+  const songReadout = $('song-readout');
+  if (songReadout) {
+    songReadout.dataset.state = 'live';
+    songReadout.dataset.dir = dirState;
+    songReadout.dataset.tuned = isTuned;
+
+    const tabBadge = $('song-tab-badge');
+    if (tabBadge) {
+      tabBadge.textContent = matches.length ? `${matches[0].dir === 'draw' ? '−' : ''}${matches[0].hole}` : noteLetter;
+      tabBadge.dataset.dir = dirState;
+    }
+
+    const noteNameEl = $('song-note-name');
+    if (noteNameEl) {
+      noteNameEl.textContent = `${noteLetter} · ~${Math.round(f.freq || midiToFreq(f.midi))} Hz`;
+    }
+
+    const songCentsDot = $('song-cents-dot');
+    if (songCentsDot) songCentsDot.style.left = `${50 + Math.max(-50, Math.min(50, f.cents))}%`;
+
+    const songCentsWord = $('song-cents-word');
+    if (songCentsWord) songCentsWord.textContent = centsWord(f.cents);
+
+    const songSteadyFill = $('song-steady-fill');
+    if (songSteadyFill) {
+      songSteadyFill.style.width = `${Math.max(0, Math.min(1, (f.clarity - 0.8) / 0.19)) * 100}%`;
+    }
   }
 
   // Update per-reed quality in real-time when a single clear hole is voiced
@@ -131,17 +174,47 @@ function show(f) {
 }
 
 function clearReadout() {
-  readout.dataset.state = 'idle';
-  delete readout.dataset.dir;
-  $('note-big').textContent = '—';
+  if (readout) {
+    readout.dataset.state = 'idle';
+    delete readout.dataset.dir;
+  }
+  const letterEl = $('note-big');
+  if (letterEl) letterEl.textContent = '—';
   const roleEl = $('note-role');
   if (roleEl) roleEl.textContent = '';
   if (performance.now() >= unclearHoldUntil) {
-    $('hole-text').textContent = mic.running ? 'Listening… play a note.' : 'Press “Start listening” and play a note.';
+    const holeTextEl = $('hole-text');
+    if (holeTextEl) {
+      holeTextEl.textContent = mic.running ? 'Listening… play a note.' : 'Press “Start listening” and play a note.';
+    }
   }
-  $('cents-dot').style.left = '50%';
-  $('cents-word').innerHTML = '&nbsp;';
-  $('steady-fill').style.width = '0';
+  const centsDot = $('cents-dot');
+  if (centsDot) centsDot.style.left = '50%';
+  const centsWordEl = $('cents-word');
+  if (centsWordEl) centsWordEl.innerHTML = '&nbsp;';
+  const steadyFill = $('steady-fill');
+  if (steadyFill) steadyFill.style.width = '0';
+
+  // Clear Song Practice Live Identifier strip
+  const songReadout = $('song-readout');
+  if (songReadout) {
+    songReadout.dataset.state = 'idle';
+    delete songReadout.dataset.dir;
+    const tabBadge = $('song-tab-badge');
+    if (tabBadge) {
+      tabBadge.textContent = '—';
+      delete tabBadge.dataset.dir;
+    }
+    const noteNameEl = $('song-note-name');
+    if (noteNameEl) noteNameEl.textContent = 'Waiting for note';
+    const songCentsDot = $('song-cents-dot');
+    if (songCentsDot) songCentsDot.style.left = '50%';
+    const songCentsWord = $('song-cents-word');
+    if (songCentsWord) songCentsWord.innerHTML = '&nbsp;';
+    const songSteadyFill = $('song-steady-fill');
+    if (songSteadyFill) songSteadyFill.style.width = '0';
+  }
+
   harps.forEach((h) => h.setLive(null));
 }
 
@@ -242,7 +315,7 @@ function makePhrase(poolKey, len) {
       id: note.id,
       letter: midiToLetter(note.midi),
       tabs: here.map(tab).join(' / '),
-      where: here.map((n) => `hole ${n.hole} ${n.dir}`).join(' or '),
+      where: here.map((n) => `${n.dir === 'draw' ? '−' : ''}${n.hole}`).join(' or '),
       dir: dirs.size > 1 ? 'both' : note.dir,
     });
     // random walk by 1–2 steps, never repeating the same note back-to-back
@@ -433,7 +506,7 @@ function onEchoNote(ev) {
   echo.misses[i] = (echo.misses[i] || 0) + 1;
   const heard = midiToLetter(ev.midi);
   const heardHoles = notesForMidi(ev.midi)
-    .map((n) => `hole ${n.hole} ${n.dir}`)
+    .map((n) => `${n.dir === 'draw' ? '−' : ''}${n.hole}`)
     .join(' or ');
 
   // Gently pulse the target hole on the harmonica map so the user knows where to slide
@@ -450,7 +523,7 @@ function onEchoNote(ev) {
     // Give 3 distinct attempts with patience before wiping progress
     const attemptsLeft = 3 - echo.misses[i];
     if (attemptsLeft > 0) {
-      setMsg(`Heard ${heard}${heardHoles ? ` (${heardHoles})` : ''} — looking for ${want.letter} (${want.where}). Try to ${dirGuide}! (${attemptsLeft} attempt${attemptsLeft > 1 ? 's' : ''} left before reset)`);
+      setMsg(`Heard ${heard}${heardHoles ? ` (tab ${heardHoles})` : ''} — looking for ${want.letter} (tab ${want.where}). Try to ${dirGuide}! (${attemptsLeft} attempt${attemptsLeft > 1 ? 's' : ''} left before reset)`);
       return;
     }
 
@@ -465,14 +538,14 @@ function onEchoNote(ev) {
   // If "Reset on mistake" is unchecked: remain at status quo with helpful guidance
   if (echo.misses[i] >= HINT_AFTER) {
     stepEl(i)?.classList.add('hint');
-    setMsg(`Here's a hint: it's ${want.letter}, ${want.where}. Try to ${dirGuide}.`);
+    setMsg(`Here's a hint: it's ${want.letter}, tab ${want.where}. Try to ${dirGuide}.`);
   } else if (ev.midi % 12 === want.midi % 12) {
     const dir = ev.midi > want.midi ? 'higher' : 'lower';
     setMsg(`Right letter (${heard}), but an octave ${dir}. Try ${ev.midi > want.midi ? 'further left' : 'further right'} on the map.`);
   } else {
     setMsg(
-      `Heard ${heard}${heardHoles ? ` (${heardHoles})` : ''}.` +
-        (ear ? ` Not quite — try to ${dirGuide}.` : ` Looking for ${want.letter} (${want.where}). Try to ${dirGuide}.`)
+      `Heard ${heard}${heardHoles ? ` (tab ${heardHoles})` : ''}.` +
+        (ear ? ` Not quite — try to ${dirGuide}.` : ` Looking for ${want.letter} (tab ${want.where}). Try to ${dirGuide}.`)
     );
   }
 }
@@ -722,11 +795,24 @@ function loadSongPhrase(idx) {
   $('song-phrase-badge').textContent = isDone ? 'Mastered ✓' : 'In progress';
   $('song-phrase-badge').className = `phrase-badge ${isDone ? 'mastered' : ''}`;
 
+  updatePhraseSequenceProgress(0, phrase.notes.length);
   $('btn-song-next-phrase').hidden = true;
-  $('song-practice-msg').textContent = 'Press “Hear phrase” to listen to the rhythm and melody, then play it back on your harmonica.';
+  $('song-practice-msg').textContent = 'Press “Hear phrase” to listen to the rhythm and melody, then play through the sequence on your harmonica.';
 
   renderPhraseSteps(phrase.notes);
   renderPhraseStepper();
+
+  if (phrase.notes[0]) {
+    const firstMatches = notesForMidi(phrase.notes[0].midi);
+    if (firstMatches.length) harpSong.cue(firstMatches[0].id);
+  }
+}
+
+function updatePhraseSequenceProgress(current, total) {
+  const counterEl = $('phrase-seq-counter');
+  if (counterEl) {
+    counterEl.textContent = `Note ${Math.min(current + 1, total)} / ${total}`;
+  }
 }
 
 function renderPhraseSteps(notes) {
@@ -734,15 +820,41 @@ function renderPhraseSteps(notes) {
   if (!container) return;
   container.innerHTML = notes.map((n, i) => {
     const meta = getRhythmMeta(n.beats || 1);
+    const isFirst = (i === 0);
     return `
-      <div class="step ${meta.cls}" data-dir="${n.dir}" data-idx="${i}" data-beats="${n.beats || 1}" title="${n.tab} (${n.dir}) — ${meta.label}">
+      <div class="step ${meta.cls}${isFirst ? ' active-step' : ''}" data-dir="${n.dir}" data-idx="${i}" data-beats="${n.beats || 1}" title="${n.tab} — ${meta.label}">
         <span class="sn">${midiToLetter(n.midi)}</span>
-        <span class="st">${n.tab} ${n.dir}</span>
+        <span class="st">${n.tab}</span>
         <span class="dur-pill ${meta.cls}">${meta.label}</span>
       </div>
     `;
   }).join('');
 }
+
+function restartSongPhraseSequence() {
+  if (!activeSong) return;
+  const phrase = activeSong.phrases[activePhraseIdx];
+  if (!phrase) return;
+
+  stopMelody();
+  songPhraseNoteIdx = 0;
+  songPhraseMisses = 0;
+  songPracticeState = 'listening';
+
+  const stepEls = $('song-phrase-steps')?.querySelectorAll('.step') || [];
+  stepEls.forEach((el, idx) => {
+    el.classList.remove('done', 'miss', 'playing', 'skipped', 'active-step');
+    if (idx === 0) el.classList.add('active-step');
+  });
+
+  updatePhraseSequenceProgress(0, phrase.notes.length);
+  const firstMatches = notesForMidi(phrase.notes[0].midi);
+  if (firstMatches.length) harpSong.cue(firstMatches[0].id);
+
+  $('song-practice-msg').textContent = `Sequence ready at note 1: ${phrase.notes[0].tab}. Flow through the phrase!`;
+}
+
+$('btn-song-restart-phrase')?.addEventListener('click', restartSongPhraseSequence);
 
 async function hearSongPhrase() {
   if (!activeSong) return;
@@ -755,7 +867,7 @@ async function hearSongPhrase() {
   $('song-practice-msg').textContent = 'Listen to the rhythm and phrasing…';
 
   const stepEls = $('song-phrase-steps').querySelectorAll('.step');
-  stepEls.forEach((el) => el.classList.remove('done', 'miss', 'playing'));
+  stepEls.forEach((el) => el.classList.remove('done', 'miss', 'playing', 'skipped', 'active-step'));
 
   const secPerBeat = 60 / activeSong.bpm;
   let totalDur = 0;
@@ -778,9 +890,16 @@ async function hearSongPhrase() {
       harpSong.flash(`${note.hole}${note.dir}`, Math.max(90, Math.min(durSec * 1000, 1600)));
     },
     onEnd: () => {
-      stepEls.forEach((el) => el.classList.remove('playing'));
+      stepEls.forEach((el, idx) => {
+        el.classList.remove('playing');
+        if (idx === 0) el.classList.add('active-step');
+      });
       songPracticeState = 'listening';
-      $('song-practice-msg').textContent = `Your turn — play note 1: ${phrase.notes[0].tab} (${phrase.notes[0].dir}).`;
+      songPhraseNoteIdx = 0;
+      updatePhraseSequenceProgress(0, phrase.notes.length);
+      const firstMatches = notesForMidi(phrase.notes[0].midi);
+      if (firstMatches.length) harpSong.cue(firstMatches[0].id);
+      $('song-practice-msg').textContent = `Your turn — play the sequence starting with note 1: ${phrase.notes[0].tab}.`;
     },
   });
 }
@@ -794,7 +913,7 @@ $('btn-song-next-phrase')?.addEventListener('click', () => {
 });
 
 function onSongNote(ev) {
-  if (songPracticeState !== 'listening' && songPracticeState !== 'idle') return;
+  if (songPracticeState !== 'listening' && songPracticeState !== 'idle' && songPracticeState !== 'playing') return;
   if (!activeSong) return;
 
   const phrase = activeSong.phrases[activePhraseIdx];
@@ -804,7 +923,6 @@ function onSongNote(ev) {
 
   const hit = ev.midi === want.midi;
   const matches = notesForMidi(want.midi);
-  const where = matches.length ? `hole ${matches[0].hole} ${matches[0].dir}` : '';
 
   // Record reed performance in local store
   if (matches.length) {
@@ -815,27 +933,29 @@ function onSongNote(ev) {
     });
   }
 
+  const stepEls = $('song-phrase-steps')?.querySelectorAll('.step') || [];
+
   if (hit) {
     harpSong.cue(null);
     mic.resetRegistered();
 
-    const stepEls = $('song-phrase-steps').querySelectorAll('.step');
-    stepEls[songPhraseNoteIdx]?.classList.remove('miss');
+    stepEls[songPhraseNoteIdx]?.classList.remove('miss', 'active-step');
     stepEls[songPhraseNoteIdx]?.classList.add('done');
 
     songPhraseNoteIdx++;
+    updatePhraseSequenceProgress(songPhraseNoteIdx, phrase.notes.length);
 
     if (songPhraseNoteIdx >= phrase.notes.length) {
-      // Phrase completed!
+      // Sequence completed!
       songPracticeState = 'done';
       store.updateSongProgress(activeSong.id, activePhraseIdx, activeSong.phrases.length);
       store.addLogEntry(`Practiced ${activeSong.title} — mastered Phrase ${activePhraseIdx + 1}`);
       refreshHeat();
 
       const isLastPhrase = activePhraseIdx >= activeSong.phrases.length - 1;
-      $('song-practice-msg').textContent = isLastPhrase
-        ? `You completed the whole song! Beautifully played.`
-        : `Phrase ${activePhraseIdx + 1} complete! Ready for the next phrase?`;
+      $('song-practice-msg').innerHTML = isLastPhrase
+        ? `🎉 <b>Full tune completed!</b> You played the entire song with great flow.`
+        : `✨ <b>Phrase ${activePhraseIdx + 1} mastered!</b> The whole sequence came together smoothly.`;
 
       if (!isLastPhrase) {
         $('btn-song-next-phrase').hidden = false;
@@ -845,23 +965,59 @@ function onSongNote(ev) {
       }
       renderPhraseStepper();
     } else {
-      $('song-practice-msg').textContent = `Good! Next note: ${phrase.notes[songPhraseNoteIdx].tab} (${phrase.notes[songPhraseNoteIdx].dir}).`;
+      // Advance active sequence highlight
+      stepEls.forEach((el, idx) => el.classList.toggle('active-step', idx === songPhraseNoteIdx));
+      const nextNote = phrase.notes[songPhraseNoteIdx];
+      $('song-practice-msg').textContent = `Good flow! Next note in sequence: ${nextNote.tab}`;
+      const nextMatches = notesForMidi(nextNote.midi);
+      if (nextMatches.length) harpSong.cue(nextMatches[0].id);
     }
     return;
   }
 
-  // Mistake:
+  // If player transitioned directly to the subsequent note in sequence:
+  const nextTarget = phrase.notes[songPhraseNoteIdx + 1];
+  if (nextTarget && ev.midi === nextTarget.midi) {
+    stepEls[songPhraseNoteIdx]?.classList.remove('active-step');
+    stepEls[songPhraseNoteIdx]?.classList.add('skipped');
+
+    stepEls[songPhraseNoteIdx + 1]?.classList.remove('miss', 'active-step');
+    stepEls[songPhraseNoteIdx + 1]?.classList.add('done');
+
+    songPhraseNoteIdx += 2;
+    mic.resetRegistered();
+    updatePhraseSequenceProgress(songPhraseNoteIdx, phrase.notes.length);
+
+    if (songPhraseNoteIdx >= phrase.notes.length) {
+      songPracticeState = 'done';
+      store.updateSongProgress(activeSong.id, activePhraseIdx, activeSong.phrases.length);
+      $('song-practice-msg').innerHTML = `✨ <b>Sequence run finished!</b> You kept the musical momentum moving.`;
+      if (activePhraseIdx < activeSong.phrases.length - 1) {
+        $('btn-song-next-phrase').hidden = false;
+      }
+      renderPhraseStepper();
+    } else {
+      stepEls.forEach((el, idx) => el.classList.toggle('active-step', idx === songPhraseNoteIdx));
+      const nextNote = phrase.notes[songPhraseNoteIdx];
+      $('song-practice-msg').textContent = `Sequence moving! Next note: ${nextNote.tab}`;
+      const nextMatches = notesForMidi(nextNote.midi);
+      if (nextMatches.length) harpSong.cue(nextMatches[0].id);
+    }
+    return;
+  }
+
+  // Not an exact match: DO NOT INTERRUPT OR FREEZE THE ATTEMPT!
+  // Subtle visual cue on target card without stopping breath or rhythm
   songPhraseMisses++;
-  const heard = midiToLetter(ev.midi);
   const targetId = matches.length ? matches[0].id : null;
   if (targetId) harpSong.cue(targetId);
 
-  const stepEls = $('song-phrase-steps').querySelectorAll('.step');
-  stepEls[songPhraseNoteIdx]?.classList.add('miss');
-  setTimeout(() => stepEls[songPhraseNoteIdx]?.classList.remove('miss'), 500);
+  stepEls[songPhraseNoteIdx]?.classList.add('pulse-guide');
+  setTimeout(() => stepEls[songPhraseNoteIdx]?.classList.remove('pulse-guide'), 400);
 
+  const targetTab = want.tab;
   const dirGuide = ev.midi < want.midi ? 'slide right' : 'slide left';
-  $('song-practice-msg').textContent = `Heard ${heard} — looking for ${where}. Try to ${dirGuide}!`;
+  $('song-practice-msg').textContent = `Keep moving! Sequence is at ${targetTab} (${dirGuide}). Replay sequence anytime with ↺.`;
 }
 
 // =====================================================================
@@ -968,7 +1124,7 @@ function inspectHole(hole, dir, midi) {
   if (hole <= 3) {
     tip = '<b>Rhythm & Chords Zone:</b> Foundation of the harmonica. For clean single notes, drop your jaw slightly and relax your tongue to avoid sounding neighbors.';
   } else if (hole === 2 && dir === 'draw') {
-    tip = '<b>Hole 2 Draw (G4):</b> The infamous beginner challenge. If it sounds flat or chokes, breathe gently from your belly with an open throat, like saying “ahhh”.';
+    tip = '<b>Tab −2 (G4):</b> The infamous beginner challenge. If it sounds flat or chokes, breathe gently from your belly with an open throat, like saying “ahhh”.';
   } else if (hole >= 4 && hole <= 7) {
     tip = '<b>Core Melody Zone:</b> Contains your full Do-Re-Mi scale. Pucker your lips like sipping through a narrow coffee straw to maintain isolation.';
   } else {
@@ -979,7 +1135,7 @@ function inspectHole(hole, dir, midi) {
   detailEl.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.5rem;">
       <h4 style="margin:0; font-size:1.15rem; font-family:var(--display);">
-        Hole ${hole} ${dir === 'blow' ? 'Blow (Exhale)' : 'Draw (Inhale)'} · ${role.letter} (${role.syllable})
+        Tab ${dir === 'draw' ? '−' : ''}${hole} · ${role.letter} (${role.syllable})
       </h4>
       <span style="font-size:.85rem; color:var(--amber); font-weight:600;">${role.role}</span>
     </div>
