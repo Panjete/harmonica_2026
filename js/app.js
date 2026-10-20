@@ -1,9 +1,9 @@
 import { ALL_NOTES, HOLES, midiToLetter, notesForMidi, tab, setRefA4, getNoteRole } from './notes.js';
 import { Listener } from './mic.js';
-import { playNote, playMelody, stopMelody } from './synth.js?v=2';
+import { playNote, playMelody, stopMelody } from './synth.js?v=3';
 import { createHarp } from './harp.js';
 import * as store from './store.js';
-import { SONGS, getSongById, getRhythmMeta } from './songs.js?v=2';
+import { SONGS, getSongById, getRhythmMeta } from './songs.js?v=3';
 
 const $ = (id) => document.getElementById(id);
 
