@@ -13,6 +13,14 @@ const cell = (hole, dir, midi) => `
  * @param {{onPress?:(n:{id:string,hole:number,dir:string,midi:number})=>void}} opts
  */
 export function createHarp(root, { onPress } = {}) {
+  if (!root) {
+    return {
+      setLive() {},
+      flash() {},
+      cue() {},
+      setHeat() {},
+    };
+  }
   root.classList.add('harp');
   root.innerHTML = `
     <div class="harp-label"><span>blow</span><small>breathe out</small></div>

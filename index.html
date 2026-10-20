@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..600,0..100&family=Manrope:wght@300..700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
   <header class="top">
@@ -83,12 +83,12 @@
       </p>
     </section>
 
-    <!-- ================= SONGS ================= -->
+    <!-- ================= SONGS: REAL EXEMPLARS & REPLICATION ================= -->
     <section id="view-songs" class="view" hidden>
       <div class="songs-header">
         <div>
-          <h2 class="view-title">Songbook</h2>
-          <p class="lede">Real melodies arranged for the 10-hole C harmonica. Listen to how each tune should sound, then learn it phrase by phrase.</p>
+          <h2 class="view-title">Songbook &amp; True Exemplars</h2>
+          <p class="lede">Learn from actual raw audio and video of iconic tracks. Study authentic harmonica tabs from real tab archives, and replicate each phrase guided by real-time pitch distance and embouchure tracking.</p>
         </div>
         <div class="song-filters" id="song-filters" role="radiogroup" aria-label="Song filter">
           <button type="button" class="filter-btn active" data-filter="all">All Songs</button>
@@ -97,73 +97,160 @@
         </div>
       </div>
 
-      <!-- SONG PRACTICE TRAY (Visible when practicing a specific song) -->
-      <div id="song-practice-tray" class="practice-tray" hidden>
+      <!-- SONG STUDY & REPLICATION STUDIO -->
+      <div id="song-practice-tray" class="practice-tray song-studio" hidden>
+        <!-- Top Navigation & Song Metadata -->
         <div class="practice-top">
           <button type="button" class="btn ghost back-btn" id="btn-song-back">← Back to Songbook</button>
           <div class="practice-meta">
-            <span class="guide-tag" id="song-practice-tag">Pop</span>
+            <div class="meta-tags">
+              <span class="guide-tag" id="song-practice-tag">Classic</span>
+              <span class="key-tag" id="song-practice-key">Key: C Harmonica</span>
+            </div>
             <h3 class="practice-title" id="song-practice-title">Piano Man</h3>
             <span class="practice-artist" id="song-practice-artist">Billy Joel (1973)</span>
           </div>
-          <div class="full-audio-control">
-            <button type="button" class="btn" id="btn-song-full-preview">
-              <span id="full-preview-icon">▶</span> <span id="full-preview-text">Listen to full tune</span>
-            </button>
+          <div class="source-link-wrap">
+            <span class="source-badge">Tab Source: <b id="song-source-name">HarpTabs.com</b></span>
           </div>
         </div>
 
-        <!-- Phrase Stepper Tabs -->
-        <div class="phrase-stepper" id="song-phrase-stepper"></div>
+        <!-- 3-Deck Studio Grid: 1. Exemplar Video, 2. Tab Breakdown, 3. Live Replication -->
+        <div class="studio-grid">
+          <!-- PANEL 1: True Exemplar Audio/Video (YouTube) -->
+          <div class="studio-panel exemplar-panel">
+            <div class="panel-header">
+              <div class="ph-title">
+                <span class="ph-icon">🎬</span>
+                <h4>True Exemplar (Real Audio)</h4>
+              </div>
+              <span class="timestamp-pill" id="exemplar-timestamp">0:25 – 0:46</span>
+            </div>
 
-        <!-- Compact Interactive Practice Console: Sequence Deck + Live Identifier & Map -->
-        <div class="practice-console">
-          <!-- LEFT: The Sequence of Moves -->
-          <div class="phrase-active-card">
-            <div class="phrase-info-bar">
-              <div class="phrase-label-group">
-                <h4 id="song-phrase-label">Phrase 1</h4>
-                <span class="phrase-seq-counter" id="phrase-seq-counter">0 / 0</span>
+            <!-- Embedded Player -->
+            <div class="yt-container">
+              <iframe id="exemplar-iframe"
+                      src=""
+                      title="Exemplar Song Performance"
+                      frameborder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowfullscreen></iframe>
+            </div>
+
+            <!-- Exemplar Controls -->
+            <div class="exemplar-controls">
+              <button type="button" class="btn primary" id="btn-play-exemplar">
+                <span id="play-exemplar-icon">▶</span> <span id="play-exemplar-text">Play Phrase Clip</span>
+              </button>
+              <button type="button" class="btn ghost" id="btn-loop-exemplar" aria-pressed="false">
+                🔁 Loop phrase
+              </button>
+              <div class="speed-toggle" aria-label="Playback speed">
+                <button type="button" class="speed-btn" data-speed="0.75" id="speed-slow">0.75x</button>
+                <button type="button" class="speed-btn active" data-speed="1.0" id="speed-normal">1.0x</button>
+              </div>
+              <a id="exemplar-yt-link" href="#" target="_blank" rel="noopener" class="yt-out-link">Open in YouTube ↗</a>
+            </div>
+          </div>
+
+          <!-- PANEL 2: Authentic Tab Breakdown & Sequence -->
+          <div class="studio-panel tabs-panel">
+            <div class="panel-header">
+              <div class="ph-title">
+                <span class="ph-icon">📜</span>
+                <h4>Authentic Tab Breakdown</h4>
+              </div>
+              <span class="phrase-seq-counter" id="phrase-seq-counter">Step 1 / 8</span>
+            </div>
+
+            <!-- Phrase Stepper -->
+            <div class="phrase-stepper" id="song-phrase-stepper"></div>
+
+            <!-- Coach Tip Box -->
+            <div class="coach-tip-box" id="coach-tip-box">
+              <span class="ct-icon">💡</span>
+              <p id="coach-tip-text">Billy Joel plays with a relaxed mouth shape. Keep the flick between 6 and −5 crisp and rhythmic.</p>
+            </div>
+
+            <!-- The Authentic Sequence of Tab Cards -->
+            <div class="phrase compact-sequence" id="song-phrase-steps"></div>
+          </div>
+
+          <!-- PANEL 3: Live Replication & Distance Guide -->
+          <div class="studio-panel replication-panel">
+            <div class="panel-header">
+              <div class="ph-title">
+                <span class="ph-icon">🎙️</span>
+                <h4>Your Live Replication &amp; Distance Guide</h4>
               </div>
               <span class="phrase-badge" id="song-phrase-badge">In progress</span>
             </div>
 
-            <!-- The Sequence of Step Cards -->
-            <div class="phrase compact-sequence" id="song-phrase-steps"></div>
+            <!-- Distance Meter & Feedback Strip -->
+            <div class="distance-strip" id="distance-strip" data-state="idle">
+              <!-- Live Played Note Badge -->
+              <div class="ds-badge-box">
+                <span class="ds-tab-badge" id="song-tab-badge">—</span>
+                <span class="ds-note-name" id="song-note-name">Listening…</span>
+              </div>
 
-            <p class="echo-msg" id="song-practice-msg">Press “Hear phrase” to listen, then play through the sequence on your harmonica.</p>
+              <!-- Distance to Target Cents Gauge -->
+              <div class="ds-gauge-box">
+                <div class="ds-gauge-label">
+                  <span>Distance to True Pitch:</span>
+                  <b id="distance-readout" class="distance-readout">Play a note</b>
+                </div>
+                <div class="ds-cents-track">
+                  <span class="ds-cents-center"></span>
+                  <i id="distance-dot" class="distance-dot"></i>
+                </div>
+                <div class="ds-cents-markers">
+                  <span>−50¢ (Flat)</span>
+                  <span>0¢ (True Pitch)</span>
+                  <span>+50¢ (Sharp)</span>
+                </div>
+              </div>
 
+              <!-- Single Note Isolation (Embouchure Clarity) -->
+              <div class="ds-clarity-box">
+                <span class="ds-clarity-label">Tone Clarity: <b id="clarity-pct">0%</b></span>
+                <div class="steady-track"><i id="song-steady-fill"></i></div>
+              </div>
+            </div>
+
+            <!-- Status Guidance Message -->
+            <p class="echo-msg" id="song-practice-msg">Listen to the exemplar clip above, then play the tabs on your C harmonica to see your pitch distance in real time.</p>
+
+            <!-- Actions Bar -->
             <div class="song-actions">
-              <button class="btn primary" id="btn-song-hear-phrase" type="button">▶ Hear phrase</button>
-              <button class="btn" id="btn-song-restart-phrase" type="button" title="Start sequence from note 1">↺ Replay sequence</button>
+              <button class="btn primary" id="btn-start-replication" type="button">🎙 Practice Replication</button>
+              <button class="btn ghost" id="btn-song-restart-phrase" type="button">↺ Reset Attempt</button>
               <button class="btn" id="btn-song-next-phrase" type="button" hidden>Next phrase →</button>
               <span class="status" id="song-mic-status" aria-live="polite"></span>
             </div>
-          </div>
 
-          <!-- RIGHT: Live Note Identifier & Compact Harmonica Map -->
-          <div class="practice-companion">
-            <!-- Live Note Identifier Strip -->
-            <div class="song-live-identifier" id="song-readout" data-state="idle">
-              <div class="sli-badge-col">
-                <span class="sli-tab-badge" id="song-tab-badge">—</span>
-                <span class="sli-note-name" id="song-note-name">Waiting for note</span>
+            <!-- Scorecard Banner (Visible after run) -->
+            <div class="replication-scorecard" id="replication-scorecard" hidden>
+              <div class="sc-header">
+                <span class="sc-icon">📊</span>
+                <span class="sc-title" id="sc-title">Replication Scorecard</span>
               </div>
-              <div class="sli-details-col">
-                <div class="sli-meter" aria-label="Pitch accuracy">
-                  <div class="meter-track"><span class="meter-tick"></span><i id="song-cents-dot"></i></div>
-                  <div class="sli-meter-labels"><span>flat</span><span id="song-cents-word">&nbsp;</span><span>sharp</span></div>
+              <div class="sc-grid">
+                <div class="sc-stat">
+                  <span class="sc-num" id="sc-matched">7 / 8</span>
+                  <span class="sc-lbl">Notes Matched</span>
                 </div>
-                <div class="sli-steady">
-                  <span class="sli-steady-label">steadiness</span>
-                  <div class="steady-track"><i id="song-steady-fill"></i></div>
+                <div class="sc-stat">
+                  <span class="sc-num" id="sc-avg-cents">±6¢</span>
+                  <span class="sc-lbl">Avg Distance</span>
+                </div>
+                <div class="sc-stat">
+                  <span class="sc-num" id="sc-clarity">91%</span>
+                  <span class="sc-lbl">Tone Clarity</span>
                 </div>
               </div>
+              <p class="sc-verdict" id="sc-verdict">Spot-on intonation! Your phrasing aligns closely with the exemplar audio.</p>
             </div>
-
-            <!-- Compact Harmonica Map -->
-            <div id="harp-song" class="compact-harp" aria-label="Harmonica map"></div>
-            <p class="legend-compact">Tabs: <b>4</b> = blow · <b>−4</b> = draw</p>
           </div>
         </div>
       </div>
@@ -362,6 +449,6 @@
     </section>
   </main>
 
-  <script type="module" src="js/app.js?v=3"></script>
+  <script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>

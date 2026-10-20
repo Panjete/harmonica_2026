@@ -760,272 +760,460 @@ main { max-width: 1180px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
   border-color: color-mix(in srgb, var(--ok) 40%, var(--line));
 }
 
-/* Song Practice Console: Split / Simultaneous Sequence + Identifier */
-.practice-console {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(310px, 1fr);
-  gap: 1.4rem;
-  align-items: stretch;
+/* =====================================================================
+   SONG STUDY & REPLICATION STUDIO
+   1. True Exemplar Video & Audio (YouTube)
+   2. Authentic Tab Breakdown & Stepper (HarpTabs)
+   3. Real-Time Replication Intonation Distance & Embouchure Guide
+   ===================================================================== */
+.song-studio {
+  background: linear-gradient(180deg, var(--surface), var(--bg-2));
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 8px);
+  padding: 1.8rem 2.2rem;
+  margin-bottom: 2.2rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, .45);
 }
 
-@media (max-width: 960px) {
-  .practice-console {
+.studio-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.6rem;
+  margin-top: .6rem;
+}
+
+@media (max-width: 1040px) {
+  .studio-grid {
     grid-template-columns: 1fr;
-    gap: 1.2rem;
+    gap: 1.4rem;
   }
 }
 
-.phrase-active-card {
+.studio-panel {
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1.2rem 1.4rem;
+  padding: 1.3rem 1.5rem;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .2);
 }
 
-.phrase-info-bar {
+.studio-panel.replication-panel {
+  grid-column: 1 / -1;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 90%, var(--surface)), var(--surface-2));
+  border-color: color-mix(in srgb, var(--line) 85%, var(--blow));
+}
+
+.panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: .8rem;
+  margin-bottom: 1rem;
+  padding-bottom: .6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
-.phrase-label-group {
+.ph-title {
   display: flex;
   align-items: center;
-  gap: .8rem;
+  gap: .6rem;
 }
-.phrase-label-group h4 { margin: 0; font-size: 1.15rem; color: var(--text); }
-.phrase-seq-counter {
+.ph-icon { font-size: 1.25rem; }
+.ph-title h4 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.18rem;
+  color: var(--text);
+  font-variation-settings: 'SOFT' 100;
+}
+
+.timestamp-pill {
   font-size: .75rem;
   font-weight: 600;
-  padding: .15rem .55rem;
+  letter-spacing: .04em;
+  padding: .2rem .65rem;
   border-radius: 999px;
+  background: color-mix(in srgb, var(--blow) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--blow) 30%, transparent);
+  color: var(--blow);
+}
+
+/* Panel 1: Exemplar Video Player */
+.yt-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+  margin-bottom: 1rem;
+}
+.yt-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.exemplar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .8rem 1rem;
+}
+.exemplar-controls .btn {
+  padding: .55rem 1rem;
+  font-size: .88rem;
+}
+.exemplar-controls .btn.active {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 15%, var(--surface));
+}
+
+.speed-toggle {
+  display: inline-flex;
+  align-items: center;
   background: var(--surface);
   border: 1px solid var(--line);
-  color: var(--dim);
+  border-radius: 999px;
+  padding: 2px;
 }
-.phrase-badge {
+.speed-btn {
+  font: inherit;
   font-size: .75rem;
+  font-weight: 600;
+  color: var(--dim);
+  background: transparent;
+  border: 0;
+  padding: .25rem .65rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all .2s var(--ease);
+}
+.speed-btn:hover { color: var(--text); }
+.speed-btn.active {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .3);
+}
+
+.yt-out-link {
+  font-size: .82rem;
+  color: var(--dim);
+  text-decoration: none;
+  margin-left: auto;
+  transition: color .2s;
+}
+.yt-out-link:hover { color: var(--blow); }
+
+/* Panel 2: Authentic Tab Breakdown */
+.coach-tip-box {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .75rem .95rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--amber) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--amber) 28%, transparent);
+  margin-bottom: 1rem;
+}
+.coach-tip-box .ct-icon { font-size: 1.15rem; flex-shrink: 0; }
+.coach-tip-box p {
+  margin: 0;
+  font-size: .88rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.meta-tags {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+}
+.key-tag {
+  font-size: .72rem;
+  font-weight: 600;
   letter-spacing: .08em;
   text-transform: uppercase;
+  color: var(--dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  padding: .15rem .55rem;
+  border-radius: 999px;
+}
+.source-badge {
+  font-size: .8rem;
   color: var(--faint);
 }
-.phrase-badge.mastered { color: var(--ok); font-weight: 600; }
+.source-badge b { color: var(--dim); }
 
-/* Compact sequence card styling */
+/* Compact Sequence Cards with Lyric Syllables & Frequencies */
 .compact-sequence {
   display: flex;
   flex-wrap: wrap;
-  gap: .55rem;
-  margin: 0 0 .9rem;
-  min-height: auto;
+  gap: .6rem;
+  margin: .4rem 0 1rem;
 }
-
 .compact-sequence .step {
-  min-width: 4.4rem;
-  max-width: 5.6rem;
-  padding: .6rem .5rem .5rem;
+  min-width: 4.6rem;
+  max-width: 5.8rem;
+  padding: .65rem .45rem .55rem;
   border-radius: 14px;
 }
 .compact-sequence .step .sn {
-  font-size: 1.75rem;
+  font-size: 1.65rem;
   line-height: 1;
 }
 .compact-sequence .step .st {
-  font-size: .88rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   margin-top: .15rem;
 }
 .compact-sequence .step[data-dir='draw'] .st { color: #7dd3fc; }
 .compact-sequence .step[data-dir='blow'] .st { color: var(--amber); }
 
-.compact-sequence .dur-pill {
-  margin-top: .25rem;
-  padding: .12rem .4rem;
+.step-lyric,
+.slyric {
+  font-size: .75rem;
+  color: var(--dim);
+  font-weight: 500;
+  margin-top: .2rem;
+  white-space: nowrap;
+}
+.step-freq,
+.sfreq {
   font-size: .65rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  margin-top: .1rem;
+}
+.step-acc-badge {
+  display: inline-block;
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: .1rem .35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 20%, var(--surface));
+  color: var(--ok);
+  margin-top: .25rem;
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
 }
 
-/* Sequence flow and focus states */
-.step.active-step {
-  border-color: var(--amber) !important;
-  box-shadow: 0 0 20px color-mix(in srgb, var(--amber) 45%, transparent);
-  transform: translateY(-2px);
-  animation: active-pulse 1.8s ease-in-out infinite;
-}
-@keyframes active-pulse {
-  0%, 100% { border-color: var(--amber); }
-  50% { border-color: #fef08a; box-shadow: 0 0 28px rgba(245, 158, 11, .6); }
-}
-
-.step.skipped {
-  opacity: .55;
-  border-style: dashed;
-}
-
-.step.pulse-guide {
-  animation: gentle-hint .35s ease;
-}
-@keyframes gentle-hint {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); border-color: var(--amber); }
-}
-
-.song-actions {
-  display: flex;
-  flex-wrap: wrap;
+/* Panel 3: Live Replication & Distance Guide */
+.distance-strip {
+  display: grid;
+  grid-template-columns: auto minmax(240px, 1fr) auto;
+  gap: 1.6rem;
   align-items: center;
-  gap: 1rem;
-  margin-top: .8rem;
-}
-
-/* Companion Column: Live Identifier & Compact Harmonica Map */
-.practice-companion {
-  display: flex;
-  flex-direction: column;
-  gap: .8rem;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 1.1rem 1.3rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
-}
-
-/* Live Note Identifier Strip */
-.song-live-identifier {
-  display: flex;
-  align-items: center;
-  gap: 1.2rem;
-  padding: .85rem 1.1rem;
+  padding: 1.1rem 1.4rem;
   background: linear-gradient(180deg, var(--surface), var(--bg-2));
   border: 1px solid var(--line);
   border-radius: 14px;
+  margin-bottom: 1.1rem;
 }
-.sli-badge-col {
+
+@media (max-width: 768px) {
+  .distance-strip {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+}
+
+.ds-badge-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 4.6rem;
+  min-width: 5.5rem;
 }
-.sli-tab-badge {
+.ds-tab-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 3.2rem;
-  height: 2.5rem;
+  min-width: 4.2rem;
+  height: 3.2rem;
   padding: 0 .6rem;
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--surface-2);
   border: 1px solid var(--line);
   font-family: var(--display);
-  font-size: 1.6rem;
+  font-size: 1.9rem;
   font-weight: 500;
   color: var(--faint);
   transition: all .2s var(--ease);
 }
-.song-live-identifier[data-state='live'] .sli-tab-badge {
+.distance-strip[data-state='live'] .ds-tab-badge {
   color: var(--text);
   border-color: var(--amber);
 }
-.song-live-identifier[data-state='live'][data-dir='blow'] .sli-tab-badge {
+.distance-strip[data-state='live'][data-dir='blow'] .ds-tab-badge {
   color: var(--blow);
   border-color: var(--blow);
   background: color-mix(in srgb, var(--blow) 15%, var(--surface-2));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--blow) 35%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--blow) 35%, transparent);
 }
-.song-live-identifier[data-state='live'][data-dir='draw'] .sli-tab-badge {
+.distance-strip[data-state='live'][data-dir='draw'] .ds-tab-badge {
   color: #7dd3fc;
   border-color: #7dd3fc;
   background: color-mix(in srgb, #7dd3fc 15%, var(--surface-2));
-  box-shadow: 0 0 18px color-mix(in srgb, #7dd3fc 35%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, #7dd3fc 35%, transparent);
 }
 
-.sli-note-name {
-  font-size: .75rem;
+.ds-note-name {
+  font-size: .8rem;
   color: var(--dim);
-  margin-top: .2rem;
+  margin-top: .3rem;
   white-space: nowrap;
 }
-.sli-details-col {
-  flex: 1;
+
+.ds-gauge-box {
   display: flex;
   flex-direction: column;
-  gap: .45rem;
+  gap: .5rem;
 }
-.sli-meter {
+.ds-gauge-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: .82rem;
+  color: var(--dim);
+}
+.distance-readout {
+  color: var(--text);
+  font-weight: 600;
+  transition: color .2s var(--ease);
+}
+.distance-readout.in-tune,
+.distance-readout.true-pitch {
+  color: var(--ok);
+  text-shadow: 0 0 10px rgba(156, 199, 160, .3);
+}
+.distance-readout.flat,
+.distance-readout.flat-pitch {
+  color: #7dd3fc;
+}
+.distance-readout.sharp,
+.distance-readout.sharp-pitch {
+  color: var(--amber);
+}
+.distance-readout.wrong-hole {
+  color: var(--dim);
+}
+
+.ds-cents-track {
   position: relative;
+  height: 10px;
+  background: var(--surface-2);
+  border-radius: 99px;
+  border: 1px solid var(--line);
 }
-#song-cents-dot {
-  position: absolute; top: 50%; left: 50%;
-  width: 14px; height: 14px; margin: -7px 0 0 -7px;
+.ds-cents-center {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--ok);
+  border-radius: 2px;
+}
+.distance-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
   border-radius: 50%;
   background: var(--faint);
   opacity: .35;
-  transition: left .12s linear, background .3s, opacity .3s;
+  transition: left .1s linear, background .25s, box-shadow .25s, opacity .25s;
 }
-.song-live-identifier[data-state='live'] #song-cents-dot { opacity: 1; background: var(--amber); }
-.song-live-identifier[data-state='live'][data-tuned='true'] #song-cents-dot { background: var(--ok); box-shadow: 0 0 14px rgba(156, 199, 160, .5); }
+.distance-strip[data-state='live'] .distance-dot {
+  opacity: 1;
+  background: var(--amber);
+  box-shadow: 0 0 12px rgba(245, 158, 11, .5);
+}
+.distance-strip[data-state='live'][data-tuned='true'] .distance-dot {
+  background: var(--ok);
+  box-shadow: 0 0 18px rgba(156, 199, 160, .6);
+}
 
-.sli-meter-labels {
+.ds-cents-markers {
   display: flex;
   justify-content: space-between;
-  font-size: .65rem;
+  font-size: .68rem;
   letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--faint);
-  margin-top: .2rem;
 }
-.sli-meter-labels span:nth-child(2) { color: var(--dim); text-transform: none; letter-spacing: .02em; font-size: .75rem; }
 
-.sli-steady {
+.ds-clarity-box {
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.ds-clarity-label {
+  font-size: .78rem;
+  color: var(--dim);
+}
+.ds-clarity-label b { color: var(--text); }
+
+/* Replication Scorecard Banner */
+.replication-scorecard {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 8%, var(--surface)), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--line));
+  border-radius: 14px;
+  padding: 1.2rem 1.6rem;
+  margin-top: 1.4rem;
+  animation: fadeIn .3s ease;
+}
+.sc-header {
   display: flex;
   align-items: center;
   gap: .6rem;
-}
-.sli-steady-label {
-  font-size: .65rem;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--faint);
-  width: 4.8rem;
-}
-#song-steady-fill {
-  display: block; height: 100%; width: 0;
-  background: linear-gradient(90deg, var(--amber), var(--ok));
-  border-radius: 99px;
-  transition: width .15s linear;
-}
-
-/* Compact Harmonica Map */
-.compact-harp.harp {
-  padding: .65rem .8rem;
-  gap: .3rem;
-  border-radius: 14px;
-}
-.compact-harp .cell {
-  padding: .45rem .15rem .4rem;
-  border-radius: 10px;
-}
-.compact-harp .cell .n {
-  font-size: clamp(.95rem, 1.8vw, 1.25rem);
-}
-.compact-harp .cell .t {
-  font-size: .72rem;
-}
-.compact-harp .harp-label {
-  font-size: .65rem;
-}
-.compact-harp .harp-holes span {
   font-size: .95rem;
-  padding: .08rem 0;
+  font-weight: 600;
+  color: var(--ok);
+  margin-bottom: .8rem;
 }
-.legend-compact {
-  font-size: .75rem;
-  color: var(--dim);
+.sc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.2rem;
+  padding: .8rem 0;
+  margin-bottom: .8rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   text-align: center;
-  margin: .1rem 0 0;
+}
+.sc-num {
+  font-family: var(--display);
+  font-size: 1.8rem;
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1;
+  font-variation-settings: 'SOFT' 100;
+}
+.sc-lbl {
+  display: block;
+  font-size: .72rem;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-top: .35rem;
+}
+.sc-verdict {
+  margin: 0;
+  font-size: .92rem;
+  color: var(--text);
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* =====================================================================

@@ -1,9 +1,9 @@
 import { ALL_NOTES, HOLES, midiToLetter, notesForMidi, tab, setRefA4, getNoteRole } from './notes.js';
 import { Listener } from './mic.js';
-import { playNote, playMelody, stopMelody } from './synth.js?v=3';
+import { playNote, playMelody, stopMelody } from './synth.js?v=4';
 import { createHarp } from './harp.js';
 import * as store from './store.js';
-import { SONGS, getSongById, getRhythmMeta } from './songs.js?v=3';
+import { SONGS, getSongById, getRhythmMeta } from './songs.js?v=4';
 
 const $ = (id) => document.getElementById(id);
 
@@ -131,34 +131,68 @@ function show(f) {
     roleEl.innerHTML = `<span class="solfege">${role.syllable} (${role.role})</span> · <span class="freq">~${role.freq} Hz</span> · <span class="family">${role.family}</span> · <span class="reg">${role.reg}</span>`;
   }
 
-  // Update Song Practice Live Identifier strip
-  const songReadout = $('song-readout');
-  if (songReadout) {
-    songReadout.dataset.state = 'live';
-    songReadout.dataset.dir = dirState;
-    songReadout.dataset.tuned = isTuned;
+  // Update Song Studio Live Distance Strip & Replication Feedback
+  const distStrip = $('distance-strip');
+  if (distStrip && currentView === 'songs' && activeSong) {
+    distStrip.dataset.state = 'live';
+    const phrase = activeSong.phrases[activePhraseIdx];
+    const want = phrase?.notes[activeReplication?.noteIdx || 0];
+
+    const playedTab = matches.length
+      ? (matches[0].dir === 'draw' ? '−' : '') + matches[0].hole
+      : noteLetter;
 
     const tabBadge = $('song-tab-badge');
     if (tabBadge) {
-      tabBadge.textContent = matches.length ? `${matches[0].dir === 'draw' ? '−' : ''}${matches[0].hole}` : noteLetter;
+      tabBadge.textContent = playedTab;
       tabBadge.dataset.dir = dirState;
     }
 
-    const noteNameEl = $('song-note-name');
-    if (noteNameEl) {
-      noteNameEl.textContent = `${noteLetter} · ~${Math.round(f.freq || midiToFreq(f.midi))} Hz`;
+    if (want) {
+      // Calculate true cents distance relative to the authentic target note
+      const centsDiff = Math.round(((f.midiFloat ?? f.midi) - want.midi) * 100);
+      const hzDiff = Math.round((f.freq || midiToFreq(f.midi)) - want.freq);
+      const isTargetHole = matches.some((m) => m.hole === want.hole && m.dir === want.dir);
+
+      const noteNameEl = $('song-note-name');
+      if (noteNameEl) {
+        noteNameEl.textContent = `${noteLetter} · ~${Math.round(f.freq || midiToFreq(f.midi))} Hz (Target: ${want.tab} / ~${Math.round(want.freq)} Hz)`;
+      }
+
+      // Distance dot on the -50c .. 0c .. +50c track
+      const distDot = $('distance-dot');
+      if (distDot) {
+        const gaugePos = 50 + Math.max(-50, Math.min(50, centsDiff));
+        distDot.style.left = `${gaugePos}%`;
+      }
+
+      const distReadout = $('distance-readout');
+      if (distReadout) {
+        if (isTargetHole) {
+          if (Math.abs(centsDiff) <= 12) {
+            distReadout.textContent = `Spot-on true pitch! (${centsDiff >= 0 ? '+' : ''}${centsDiff}¢)`;
+            distReadout.className = 'distance-readout true-pitch';
+          } else if (centsDiff < -12) {
+            distReadout.textContent = `${Math.abs(centsDiff)}¢ flat from true (${hzDiff} Hz) · Lift breath`;
+            distReadout.className = 'distance-readout flat-pitch';
+          } else {
+            distReadout.textContent = `+${centsDiff}¢ sharp from true (+${hzDiff} Hz) · Relax jaw`;
+            distReadout.className = 'distance-readout sharp-pitch';
+          }
+        } else {
+          const slideDir = f.midi < want.midi ? 'slide right ➔' : 'slide left ⬅';
+          distReadout.textContent = `Voiced ${playedTab} · Target is ${want.tab} (${slideDir})`;
+          distReadout.className = 'distance-readout wrong-hole';
+        }
+      }
     }
 
-    const songCentsDot = $('song-cents-dot');
-    if (songCentsDot) songCentsDot.style.left = `${50 + Math.max(-50, Math.min(50, f.cents))}%`;
-
-    const songCentsWord = $('song-cents-word');
-    if (songCentsWord) songCentsWord.textContent = centsWord(f.cents);
-
-    const songSteadyFill = $('song-steady-fill');
-    if (songSteadyFill) {
-      songSteadyFill.style.width = `${Math.max(0, Math.min(1, (f.clarity - 0.8) / 0.19)) * 100}%`;
-    }
+    // Single-hole embouchure clarity percentage
+    const clarityPct = Math.round(Math.max(0, Math.min(100, ((f.clarity || 0.8) - 0.7) / 0.28 * 100)));
+    const clarityEl = $('clarity-pct');
+    if (clarityEl) clarityEl.textContent = `${clarityPct}%`;
+    const songSteady = $('song-steady-fill');
+    if (songSteady) songSteady.style.width = `${clarityPct}%`;
   }
 
   // Update per-reed quality in real-time when a single clear hole is voiced
@@ -195,24 +229,19 @@ function clearReadout() {
   const steadyFill = $('steady-fill');
   if (steadyFill) steadyFill.style.width = '0';
 
-  // Clear Song Practice Live Identifier strip
-  const songReadout = $('song-readout');
-  if (songReadout) {
-    songReadout.dataset.state = 'idle';
-    delete songReadout.dataset.dir;
+  // Clear Song Studio Live Distance Strip
+  const distStrip = $('distance-strip');
+  if (distStrip) {
+    distStrip.dataset.state = 'idle';
     const tabBadge = $('song-tab-badge');
     if (tabBadge) {
       tabBadge.textContent = '—';
       delete tabBadge.dataset.dir;
     }
-    const noteNameEl = $('song-note-name');
-    if (noteNameEl) noteNameEl.textContent = 'Waiting for note';
-    const songCentsDot = $('song-cents-dot');
-    if (songCentsDot) songCentsDot.style.left = '50%';
-    const songCentsWord = $('song-cents-word');
-    if (songCentsWord) songCentsWord.innerHTML = '&nbsp;';
-    const songSteadyFill = $('song-steady-fill');
-    if (songSteadyFill) songSteadyFill.style.width = '0';
+    const distDot = $('distance-dot');
+    if (distDot) distDot.style.left = '50%';
+    const songSteady = $('song-steady-fill');
+    if (songSteady) songSteady.style.width = '0%';
   }
 
   harps.forEach((h) => h.setLive(null));
@@ -600,15 +629,27 @@ function onNote(ev) {
 }
 
 // =====================================================================
-// Songbook: browse, full-tune preview, phrase-by-phrase practice
+// Songbook Studio: authentic exemplars (YouTube), HarpTabs breakdowns,
+// and real-time distance-to-true-audio replication
 // =====================================================================
 let songFilter = 'all';
-let currentPreviewSongId = null;
 let activeSong = null;
 let activePhraseIdx = 0;
-let songPracticeState = 'idle'; // 'idle' | 'playing' | 'listening' | 'done'
-let songPhraseNoteIdx = 0;
-let songPhraseMisses = 0;
+let isLoopingPhrase = false;
+let currentPlaybackRate = 1.0;
+let exemplarTimer = null;
+let activeReplication = {
+  noteIdx: 0,
+  attempts: [],
+  misses: 0,
+  completed: false,
+};
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
 
 function renderSongbook() {
   const grid = $('songs-grid');
@@ -629,8 +670,6 @@ function renderSongbook() {
       badgeClass = 'style="color:var(--amber);border-color:var(--amber);"';
     }
 
-    const isPlaying = currentPreviewSongId === s.id;
-
     return `
       <article class="song-card" data-id="${s.id}">
         <div class="song-card-top">
@@ -645,17 +684,17 @@ function renderSongbook() {
         <div class="song-card-meta">
           <span>${s.difficulty}</span>
           <span>·</span>
-          <span>${s.bpm} BPM</span>
+          <span>${s.key || 'C Harmonica'}</span>
           <span>·</span>
           <span>${s.phrases.length} phrases</span>
         </div>
         <div class="song-card-actions">
-          <button type="button" class="btn btn-preview ${isPlaying ? 'playing' : ''}" data-action="preview" data-id="${s.id}">
-            ${isPlaying ? '⏹ Stop' : '▶ Listen'}
-          </button>
           <button type="button" class="btn primary" data-action="practice" data-id="${s.id}">
-            Practice
+            Study &amp; Replicate
           </button>
+          <a href="https://www.youtube.com/watch?v=${s.ytId}" target="_blank" rel="noopener" class="btn ghost yt-card-link">
+            🎬 YouTube ↗
+          </a>
         </div>
       </article>
     `;
@@ -671,67 +710,21 @@ $('song-filters')?.addEventListener('click', (e) => {
   renderSongbook();
 });
 
-// Song card action clicks (preview or practice)
+// Song card action clicks
 $('songs-grid')?.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-action]');
+  const btn = e.target.closest('button[data-action="practice"]');
   if (!btn) return;
   const songId = btn.dataset.id;
   const song = getSongById(songId);
-  if (!song) return;
-
-  if (btn.dataset.action === 'preview') {
-    toggleFullSongPreview(song);
-  } else if (btn.dataset.action === 'practice') {
-    openSongPractice(song);
-  }
+  if (song) openSongPractice(song);
 });
-
-function toggleFullSongPreview(song) {
-  if (currentPreviewSongId === song.id) {
-    stopMelody();
-    currentPreviewSongId = null;
-    harps.forEach((h) => h.setLive(null));
-    renderSongbook();
-    updatePracticeTrayPreviewBtn();
-    return;
-  }
-
-  stopMelody();
-  currentPreviewSongId = song.id;
-  renderSongbook();
-  updatePracticeTrayPreviewBtn();
-
-  const allNotes = song.phrases.flatMap((p) => p.notes);
-  playMelody(allNotes, {
-    bpm: song.bpm,
-    onNote: (i, note, durSec) => {
-      harps.forEach((h) => h.setLive(note.midi));
-      const holdMs = Math.max(70, Math.min(durSec * 1000 - 20, 1600));
-      setTimeout(() => harps.forEach((h) => h.setLive(null)), holdMs);
-    },
-    onEnd: () => {
-      currentPreviewSongId = null;
-      harps.forEach((h) => h.setLive(null));
-      renderSongbook();
-      updatePracticeTrayPreviewBtn();
-    },
-  });
-}
-
-function updatePracticeTrayPreviewBtn() {
-  const btn = $('btn-song-full-preview');
-  if (!btn) return;
-  const isPlaying = activeSong && currentPreviewSongId === activeSong.id;
-  btn.classList.toggle('playing', isPlaying);
-  $('full-preview-icon').textContent = isPlaying ? '⏹' : '▶';
-  $('full-preview-text').textContent = isPlaying ? 'Stop preview' : 'Listen to full tune';
-}
 
 function openSongPractice(song) {
   stopMelody();
-  currentPreviewSongId = null;
   activeSong = song;
   activePhraseIdx = 0;
+  isLoopingPhrase = false;
+  currentPlaybackRate = 1.0;
 
   $('song-practice-tray').hidden = false;
   $('songs-grid').hidden = true;
@@ -739,27 +732,26 @@ function openSongPractice(song) {
   $('song-practice-tag').textContent = song.tag;
   $('song-practice-title').textContent = song.title;
   $('song-practice-artist').textContent = `${song.artist} (${song.year})`;
+  if ($('song-practice-key')) $('song-practice-key').textContent = song.key || 'Key: C Harmonica';
+  if ($('song-source-name')) $('song-source-name').textContent = song.source || 'HarpTabs.com';
 
-  updatePracticeTrayPreviewBtn();
   renderPhraseStepper();
   loadSongPhrase(0);
 }
 
 function closeSongPractice() {
-  stopMelody();
-  currentPreviewSongId = null;
-  activeSong = null;
-  songPracticeState = 'idle';
+  if (exemplarTimer) clearTimeout(exemplarTimer);
+  const iframe = $('exemplar-iframe');
+  if (iframe) iframe.src = '';
 
+  activeSong = null;
+  isLoopingPhrase = false;
   $('song-practice-tray').hidden = true;
   $('songs-grid').hidden = false;
   renderSongbook();
 }
 
 $('btn-song-back')?.addEventListener('click', closeSongPractice);
-$('btn-song-full-preview')?.addEventListener('click', () => {
-  if (activeSong) toggleFullSongPreview(activeSong);
-});
 
 function renderPhraseStepper() {
   const stepper = $('song-phrase-stepper');
@@ -782,129 +774,218 @@ $('song-phrase-stepper')?.addEventListener('click', (e) => {
 });
 
 function loadSongPhrase(idx) {
+  if (!activeSong) return;
+  if (exemplarTimer) clearTimeout(exemplarTimer);
+
   activePhraseIdx = idx;
-  songPhraseNoteIdx = 0;
-  songPhraseMisses = 0;
-  songPracticeState = 'idle';
-
   const phrase = activeSong.phrases[idx];
-  $('song-phrase-label').textContent = phrase.label;
+  if (!phrase) return;
 
+  activeReplication = {
+    noteIdx: 0,
+    attempts: [],
+    misses: 0,
+    completed: false,
+  };
+
+  // Update phrase status badge
   const prog = store.getSongProgress(activeSong.id);
   const isDone = (prog?.phrasesCompleted || 0) > idx;
-  $('song-phrase-badge').textContent = isDone ? 'Mastered ✓' : 'In progress';
-  $('song-phrase-badge').className = `phrase-badge ${isDone ? 'mastered' : ''}`;
+  const badgeEl = $('song-phrase-badge');
+  if (badgeEl) {
+    badgeEl.textContent = isDone ? 'Mastered ✓' : 'In progress';
+    badgeEl.className = `phrase-badge ${isDone ? 'mastered' : ''}`;
+  }
 
-  updatePhraseSequenceProgress(0, phrase.notes.length);
-  $('btn-song-next-phrase').hidden = true;
-  $('song-practice-msg').textContent = 'Press “Hear phrase” to listen to the rhythm and melody, then play through the sequence on your harmonica.';
+  // Update timestamps & coach tip
+  const tsEl = $('exemplar-timestamp');
+  if (tsEl) tsEl.textContent = `${formatTime(phrase.start)} – ${formatTime(phrase.end)}`;
 
+  const tipEl = $('coach-tip-text');
+  if (tipEl) tipEl.textContent = phrase.coachTip || 'Focus on single-hole embouchure and breath support.';
+
+  const ytLink = $('exemplar-yt-link');
+  if (ytLink) ytLink.href = `https://www.youtube.com/watch?v=${activeSong.ytId}&t=${phrase.start}s`;
+
+  // Set YouTube embed source
+  const iframe = $('exemplar-iframe');
+  if (iframe) {
+    iframe.src = `https://www.youtube-nocookie.com/embed/${activeSong.ytId}?start=${phrase.start}&end=${phrase.end}&enablejsapi=1&rel=0`;
+  }
+
+  // Reset play button
+  $('btn-play-exemplar')?.classList.remove('playing');
+  if ($('play-exemplar-icon')) $('play-exemplar-icon').textContent = '▶';
+  if ($('play-exemplar-text')) $('play-exemplar-text').textContent = 'Play Phrase Clip';
+
+  // Hide scorecard & next phrase button
+  const sc = $('replication-scorecard');
+  if (sc) sc.hidden = true;
+  const nextBtn = $('btn-song-next-phrase');
+  if (nextBtn) nextBtn.hidden = true;
+
+  // Render tab steps
   renderPhraseSteps(phrase.notes);
   renderPhraseStepper();
 
-  if (phrase.notes[0]) {
-    const firstMatches = notesForMidi(phrase.notes[0].midi);
-    if (firstMatches.length) harpSong.cue(firstMatches[0].id);
-  }
-}
+  // Reset replication distance strip & message
+  const distStrip = $('distance-strip');
+  if (distStrip) distStrip.dataset.state = 'idle';
 
-function updatePhraseSequenceProgress(current, total) {
-  const counterEl = $('phrase-seq-counter');
-  if (counterEl) {
-    counterEl.textContent = `Note ${Math.min(current + 1, total)} / ${total}`;
+  const tabBadge = $('song-tab-badge');
+  if (tabBadge) {
+    tabBadge.textContent = '—';
+    delete tabBadge.dataset.dir;
   }
+
+  const firstNote = phrase.notes[0];
+  const noteNameEl = $('song-note-name');
+  if (noteNameEl && firstNote) {
+    noteNameEl.textContent = `Target note 1: ${firstNote.tab} (~${Math.round(firstNote.freq)} Hz)`;
+  }
+
+  const distReadout = $('distance-readout');
+  if (distReadout && firstNote) {
+    distReadout.textContent = `Play note 1 (${firstNote.tab})`;
+    distReadout.className = 'distance-readout';
+  }
+
+  const distDot = $('distance-dot');
+  if (distDot) distDot.style.left = '50%';
+
+  const clarityEl = $('clarity-pct');
+  if (clarityEl) clarityEl.textContent = '0%';
+
+  const steadyFill = $('song-steady-fill');
+  if (steadyFill) steadyFill.style.width = '0%';
+
+  $('phrase-seq-counter').textContent = `Note 1 / ${phrase.notes.length}`;
+  $('song-practice-msg').textContent = `Play the exemplar clip above to hear the artist, then play note 1 (${firstNote ? firstNote.tab : ''}) into your mic.`;
 }
 
 function renderPhraseSteps(notes) {
   const container = $('song-phrase-steps');
   if (!container) return;
+
   container.innerHTML = notes.map((n, i) => {
-    const meta = getRhythmMeta(n.beats || 1);
-    const isFirst = (i === 0);
+    const isFirst = i === 0;
     return `
-      <div class="step ${meta.cls}${isFirst ? ' active-step' : ''}" data-dir="${n.dir}" data-idx="${i}" data-beats="${n.beats || 1}" title="${n.tab} — ${meta.label}">
+      <div class="step ${isFirst ? 'active-step' : ''}" data-dir="${n.dir}" data-idx="${i}" data-tab="${n.tab}">
         <span class="sn">${midiToLetter(n.midi)}</span>
         <span class="st">${n.tab}</span>
-        <span class="dur-pill ${meta.cls}">${meta.label}</span>
+        <span class="sfreq">~${Math.round(n.freq)} Hz</span>
+        ${n.lyric ? `<span class="slyric">${n.lyric}</span>` : ''}
       </div>
     `;
   }).join('');
 }
 
-function restartSongPhraseSequence() {
+// YouTube Player Controls
+function playPhraseClip() {
   if (!activeSong) return;
   const phrase = activeSong.phrases[activePhraseIdx];
   if (!phrase) return;
 
-  stopMelody();
-  songPhraseNoteIdx = 0;
-  songPhraseMisses = 0;
-  songPracticeState = 'listening';
+  const iframe = $('exemplar-iframe');
+  if (!iframe) return;
+
+  // Load and autoplay clip
+  iframe.src = `https://www.youtube-nocookie.com/embed/${activeSong.ytId}?start=${phrase.start}&end=${phrase.end}&autoplay=1&enablejsapi=1&rel=0`;
+
+  const btn = $('btn-play-exemplar');
+  if (btn) btn.classList.add('playing');
+  if ($('play-exemplar-icon')) $('play-exemplar-icon').textContent = '⏹';
+  if ($('play-exemplar-text')) $('play-exemplar-text').textContent = 'Playing Clip…';
+
+  const clipDurationSec = (phrase.end - phrase.start) / currentPlaybackRate;
+  if (exemplarTimer) clearTimeout(exemplarTimer);
+
+  exemplarTimer = setTimeout(() => {
+    if (btn) btn.classList.remove('playing');
+    if ($('play-exemplar-icon')) $('play-exemplar-icon').textContent = '▶';
+    if ($('play-exemplar-text')) $('play-exemplar-text').textContent = 'Play Phrase Clip';
+
+    if (isLoopingPhrase && activeSong) {
+      playPhraseClip();
+    }
+  }, clipDurationSec * 1000 + 400);
+}
+
+$('btn-play-exemplar')?.addEventListener('click', () => {
+  if ($('btn-play-exemplar').classList.contains('playing')) {
+    if (exemplarTimer) clearTimeout(exemplarTimer);
+    const iframe = $('exemplar-iframe');
+    const phrase = activeSong?.phrases[activePhraseIdx];
+    if (iframe && phrase && activeSong) {
+      iframe.src = `https://www.youtube-nocookie.com/embed/${activeSong.ytId}?start=${phrase.start}&end=${phrase.end}&enablejsapi=1&rel=0`;
+    }
+    $('btn-play-exemplar').classList.remove('playing');
+    if ($('play-exemplar-icon')) $('play-exemplar-icon').textContent = '▶';
+    if ($('play-exemplar-text')) $('play-exemplar-text').textContent = 'Play Phrase Clip';
+  } else {
+    playPhraseClip();
+  }
+});
+
+$('btn-loop-exemplar')?.addEventListener('click', () => {
+  isLoopingPhrase = !isLoopingPhrase;
+  const btn = $('btn-loop-exemplar');
+  if (btn) {
+    btn.classList.toggle('active', isLoopingPhrase);
+    btn.setAttribute('aria-pressed', String(isLoopingPhrase));
+  }
+});
+
+// Speed Toggle
+$('speed-slow')?.addEventListener('click', () => {
+  currentPlaybackRate = 0.75;
+  $('speed-slow').classList.add('active');
+  $('speed-normal').classList.remove('active');
+});
+
+$('speed-normal')?.addEventListener('click', () => {
+  currentPlaybackRate = 1.0;
+  $('speed-normal').classList.add('active');
+  $('speed-slow').classList.remove('active');
+});
+
+// Start replication manually or reset
+$('btn-start-replication')?.addEventListener('click', async () => {
+  if (!mic.running) await startMic($('song-mic-status'));
+  restartReplication();
+});
+
+$('btn-song-restart-phrase')?.addEventListener('click', restartReplication);
+
+function restartReplication() {
+  if (!activeSong) return;
+  const phrase = activeSong.phrases[activePhraseIdx];
+  if (!phrase) return;
+
+  activeReplication = {
+    noteIdx: 0,
+    attempts: [],
+    misses: 0,
+    completed: false,
+  };
+
+  const sc = $('replication-scorecard');
+  if (sc) sc.hidden = true;
+  const nextBtn = $('btn-song-next-phrase');
+  if (nextBtn) nextBtn.hidden = true;
 
   const stepEls = $('song-phrase-steps')?.querySelectorAll('.step') || [];
   stepEls.forEach((el, idx) => {
-    el.classList.remove('done', 'miss', 'playing', 'skipped', 'active-step');
+    el.classList.remove('done', 'miss', 'playing', 'skipped', 'active-step', 'pulse-guide');
+    const badge = el.querySelector('.step-acc-badge');
+    if (badge) badge.remove();
     if (idx === 0) el.classList.add('active-step');
   });
 
-  updatePhraseSequenceProgress(0, phrase.notes.length);
-  const firstMatches = notesForMidi(phrase.notes[0].midi);
-  if (firstMatches.length) harpSong.cue(firstMatches[0].id);
-
-  $('song-practice-msg').textContent = `Sequence ready at note 1: ${phrase.notes[0].tab}. Flow through the phrase!`;
+  $('phrase-seq-counter').textContent = `Note 1 / ${phrase.notes.length}`;
+  const firstNote = phrase.notes[0];
+  $('song-practice-msg').textContent = `Ready! Play note 1: ${firstNote ? firstNote.tab : ''} (~${Math.round(firstNote?.freq || 0)} Hz)`;
 }
-
-$('btn-song-restart-phrase')?.addEventListener('click', restartSongPhraseSequence);
-
-async function hearSongPhrase() {
-  if (!activeSong) return;
-  stopMelody();
-  if (!mic.running) await startMic($('song-mic-status'));
-
-  const phrase = activeSong.phrases[activePhraseIdx];
-  songPhraseNoteIdx = 0;
-  songPracticeState = 'playing';
-  $('song-practice-msg').textContent = 'Listen to the rhythm and phrasing…';
-
-  const stepEls = $('song-phrase-steps').querySelectorAll('.step');
-  stepEls.forEach((el) => el.classList.remove('done', 'miss', 'playing', 'skipped', 'active-step'));
-
-  const secPerBeat = 60 / activeSong.bpm;
-  let totalDur = 0;
-  phrase.notes.forEach((n) => totalDur += (n.beats || 1) * secPerBeat);
-
-  mic.ignoreFor(totalDur * 1000 + 400);
-
-  playMelody(phrase.notes, {
-    bpm: activeSong.bpm,
-    onNote: (i, note, durSec) => {
-      stepEls.forEach((el, idx) => {
-        if (idx === i) {
-          el.classList.add('playing');
-          const offMs = Math.max(70, durSec * 1000 - 25);
-          setTimeout(() => el.classList.remove('playing'), offMs);
-        } else {
-          el.classList.remove('playing');
-        }
-      });
-      harpSong.flash(`${note.hole}${note.dir}`, Math.max(90, Math.min(durSec * 1000, 1600)));
-    },
-    onEnd: () => {
-      stepEls.forEach((el, idx) => {
-        el.classList.remove('playing');
-        if (idx === 0) el.classList.add('active-step');
-      });
-      songPracticeState = 'listening';
-      songPhraseNoteIdx = 0;
-      updatePhraseSequenceProgress(0, phrase.notes.length);
-      const firstMatches = notesForMidi(phrase.notes[0].midi);
-      if (firstMatches.length) harpSong.cue(firstMatches[0].id);
-      $('song-practice-msg').textContent = `Your turn — play the sequence starting with note 1: ${phrase.notes[0].tab}.`;
-    },
-  });
-}
-
-$('btn-song-hear-phrase')?.addEventListener('click', hearSongPhrase);
 
 $('btn-song-next-phrase')?.addEventListener('click', () => {
   if (activeSong && activePhraseIdx < activeSong.phrases.length - 1) {
@@ -912,112 +993,171 @@ $('btn-song-next-phrase')?.addEventListener('click', () => {
   }
 });
 
+// Replication logic: match sequence against true audio target frequencies
 function onSongNote(ev) {
-  if (songPracticeState !== 'listening' && songPracticeState !== 'idle' && songPracticeState !== 'playing') return;
-  if (!activeSong) return;
-
+  if (!activeSong || activeReplication.completed) return;
   const phrase = activeSong.phrases[activePhraseIdx];
   if (!phrase) return;
-  const want = phrase.notes[songPhraseNoteIdx];
+
+  const want = phrase.notes[activeReplication.noteIdx];
   if (!want) return;
 
   const hit = ev.midi === want.midi;
-  const matches = notesForMidi(want.midi);
+  const centsDiff = Math.round(((ev.midiFloat ?? ev.midi) - want.midi) * 100);
+  const stepEls = $('song-phrase-steps')?.querySelectorAll('.step') || [];
 
-  // Record reed performance in local store
+  // Record reed quality in local storage
+  const matches = notesForMidi(want.midi);
   if (matches.length) {
     store.recordReedQuality(matches[0].hole, matches[0].dir, {
       hit,
-      cents: ev.cents,
+      cents: centsDiff,
       clarity: ev.clarity,
     });
   }
 
-  const stepEls = $('song-phrase-steps')?.querySelectorAll('.step') || [];
-
   if (hit) {
-    harpSong.cue(null);
+    // Current target matched!
     mic.resetRegistered();
+    activeReplication.attempts.push({
+      tab: want.tab,
+      cents: centsDiff,
+      clarity: ev.clarity,
+      hit: true,
+    });
 
-    stepEls[songPhraseNoteIdx]?.classList.remove('miss', 'active-step');
-    stepEls[songPhraseNoteIdx]?.classList.add('done');
+    const curStep = stepEls[activeReplication.noteIdx];
+    if (curStep) {
+      curStep.classList.remove('miss', 'active-step');
+      curStep.classList.add('done');
+      const badge = document.createElement('span');
+      badge.className = 'step-acc-badge';
+      badge.textContent = `${centsDiff >= 0 ? '+' : ''}${centsDiff}¢`;
+      curStep.appendChild(badge);
+    }
 
-    songPhraseNoteIdx++;
-    updatePhraseSequenceProgress(songPhraseNoteIdx, phrase.notes.length);
+    activeReplication.noteIdx++;
+    $('phrase-seq-counter').textContent = `Note ${Math.min(activeReplication.noteIdx + 1, phrase.notes.length)} / ${phrase.notes.length}`;
 
-    if (songPhraseNoteIdx >= phrase.notes.length) {
-      // Sequence completed!
-      songPracticeState = 'done';
-      store.updateSongProgress(activeSong.id, activePhraseIdx, activeSong.phrases.length);
-      store.addLogEntry(`Practiced ${activeSong.title} — mastered Phrase ${activePhraseIdx + 1}`);
-      refreshHeat();
-
-      const isLastPhrase = activePhraseIdx >= activeSong.phrases.length - 1;
-      $('song-practice-msg').innerHTML = isLastPhrase
-        ? `🎉 <b>Full tune completed!</b> You played the entire song with great flow.`
-        : `✨ <b>Phrase ${activePhraseIdx + 1} mastered!</b> The whole sequence came together smoothly.`;
-
-      if (!isLastPhrase) {
-        $('btn-song-next-phrase').hidden = false;
-        $('btn-song-next-phrase').textContent = `Next phrase (${activePhraseIdx + 2}/${activeSong.phrases.length}) →`;
-      } else {
-        $('btn-song-next-phrase').hidden = true;
-      }
-      renderPhraseStepper();
+    if (activeReplication.noteIdx >= phrase.notes.length) {
+      finishPhraseReplication(phrase);
     } else {
-      // Advance active sequence highlight
-      stepEls.forEach((el, idx) => el.classList.toggle('active-step', idx === songPhraseNoteIdx));
-      const nextNote = phrase.notes[songPhraseNoteIdx];
-      $('song-practice-msg').textContent = `Good flow! Next note in sequence: ${nextNote.tab}`;
-      const nextMatches = notesForMidi(nextNote.midi);
-      if (nextMatches.length) harpSong.cue(nextMatches[0].id);
+      stepEls.forEach((el, idx) => el.classList.toggle('active-step', idx === activeReplication.noteIdx));
+      const nextNote = phrase.notes[activeReplication.noteIdx];
+      $('song-practice-msg').textContent = `Great replication! Next note: ${nextNote.tab} (~${Math.round(nextNote.freq)} Hz)`;
     }
     return;
   }
 
-  // If player transitioned directly to the subsequent note in sequence:
-  const nextTarget = phrase.notes[songPhraseNoteIdx + 1];
+  // Smooth sequence continuation: did the player slide into the next note in sequence?
+  const nextTarget = phrase.notes[activeReplication.noteIdx + 1];
   if (nextTarget && ev.midi === nextTarget.midi) {
-    stepEls[songPhraseNoteIdx]?.classList.remove('active-step');
-    stepEls[songPhraseNoteIdx]?.classList.add('skipped');
-
-    stepEls[songPhraseNoteIdx + 1]?.classList.remove('miss', 'active-step');
-    stepEls[songPhraseNoteIdx + 1]?.classList.add('done');
-
-    songPhraseNoteIdx += 2;
     mic.resetRegistered();
-    updatePhraseSequenceProgress(songPhraseNoteIdx, phrase.notes.length);
+    activeReplication.attempts.push({
+      tab: want.tab,
+      cents: centsDiff,
+      clarity: ev.clarity,
+      hit: false,
+      skipped: true,
+    });
+    activeReplication.attempts.push({
+      tab: nextTarget.tab,
+      cents: Math.round(((ev.midiFloat ?? ev.midi) - nextTarget.midi) * 100),
+      clarity: ev.clarity,
+      hit: true,
+    });
 
-    if (songPhraseNoteIdx >= phrase.notes.length) {
-      songPracticeState = 'done';
-      store.updateSongProgress(activeSong.id, activePhraseIdx, activeSong.phrases.length);
-      $('song-practice-msg').innerHTML = `✨ <b>Sequence run finished!</b> You kept the musical momentum moving.`;
-      if (activePhraseIdx < activeSong.phrases.length - 1) {
-        $('btn-song-next-phrase').hidden = false;
-      }
-      renderPhraseStepper();
+    if (stepEls[activeReplication.noteIdx]) {
+      stepEls[activeReplication.noteIdx].classList.remove('active-step');
+      stepEls[activeReplication.noteIdx].classList.add('skipped');
+    }
+    if (stepEls[activeReplication.noteIdx + 1]) {
+      stepEls[activeReplication.noteIdx + 1].classList.remove('active-step');
+      stepEls[activeReplication.noteIdx + 1].classList.add('done');
+    }
+
+    activeReplication.noteIdx += 2;
+    $('phrase-seq-counter').textContent = `Note ${Math.min(activeReplication.noteIdx + 1, phrase.notes.length)} / ${phrase.notes.length}`;
+
+    if (activeReplication.noteIdx >= phrase.notes.length) {
+      finishPhraseReplication(phrase);
     } else {
-      stepEls.forEach((el, idx) => el.classList.toggle('active-step', idx === songPhraseNoteIdx));
-      const nextNote = phrase.notes[songPhraseNoteIdx];
-      $('song-practice-msg').textContent = `Sequence moving! Next note: ${nextNote.tab}`;
-      const nextMatches = notesForMidi(nextNote.midi);
-      if (nextMatches.length) harpSong.cue(nextMatches[0].id);
+      stepEls.forEach((el, idx) => el.classList.toggle('active-step', idx === activeReplication.noteIdx));
+      const nextNote = phrase.notes[activeReplication.noteIdx];
+      $('song-practice-msg').textContent = `Keep the rhythm flowing! Next note: ${nextNote.tab} (~${Math.round(nextNote.freq)} Hz)`;
     }
     return;
   }
 
-  // Not an exact match: DO NOT INTERRUPT OR FREEZE THE ATTEMPT!
-  // Subtle visual cue on target card without stopping breath or rhythm
-  songPhraseMisses++;
-  const targetId = matches.length ? matches[0].id : null;
-  if (targetId) harpSong.cue(targetId);
+  // Non-interrupting guidance when missing:
+  activeReplication.misses++;
+  const playedMatches = notesForMidi(ev.midi);
+  const playedTab = playedMatches.length
+    ? (playedMatches[0].dir === 'draw' ? '−' : '') + playedMatches[0].hole
+    : midiToLetter(ev.midi);
 
-  stepEls[songPhraseNoteIdx]?.classList.add('pulse-guide');
-  setTimeout(() => stepEls[songPhraseNoteIdx]?.classList.remove('pulse-guide'), 400);
+  if (stepEls[activeReplication.noteIdx]) {
+    stepEls[activeReplication.noteIdx].classList.add('pulse-guide');
+    setTimeout(() => stepEls[activeReplication.noteIdx]?.classList.remove('pulse-guide'), 350);
+  }
 
-  const targetTab = want.tab;
-  const dirGuide = ev.midi < want.midi ? 'slide right' : 'slide left';
-  $('song-practice-msg').textContent = `Keep moving! Sequence is at ${targetTab} (${dirGuide}). Replay sequence anytime with ↺.`;
+  const slideTip = ev.midi < want.midi ? 'slide right' : 'slide left';
+  $('song-practice-msg').textContent = `Target is ${want.tab} (heard ${playedTab} · ${slideTip}). Keep your breath moving!`;
+}
+
+function finishPhraseReplication(phrase) {
+  activeReplication.completed = true;
+  store.updateSongProgress(activeSong.id, activePhraseIdx, activeSong.phrases.length);
+  store.addLogEntry(`Replicated ${activeSong.title} — Phrase ${activePhraseIdx + 1}`);
+  refreshHeat();
+
+  const attempts = activeReplication.attempts;
+  const hitCount = attempts.filter((a) => a.hit).length;
+  const totalNotes = phrase.notes.length;
+
+  const centsList = attempts.filter((a) => a.hit).map((a) => Math.abs(a.cents));
+  const avgCents = centsList.length
+    ? Math.round(centsList.reduce((a, b) => a + b, 0) / centsList.length)
+    : 0;
+
+  const clarities = attempts.map((a) => a.clarity || 0.85);
+  const avgClarity = clarities.length
+    ? Math.round((clarities.reduce((a, b) => a + b, 0) / clarities.length) * 100)
+    : 90;
+
+  // Render scorecard
+  const sc = $('replication-scorecard');
+  if (sc) {
+    sc.hidden = false;
+    $('sc-title').textContent = `Phrase ${activePhraseIdx + 1} Replication Scorecard`;
+    $('sc-matched').textContent = `${hitCount} / ${totalNotes}`;
+    $('sc-avg-cents').textContent = `±${avgCents}¢`;
+    $('sc-clarity').textContent = `${avgClarity}%`;
+
+    let verdict = '';
+    if (avgCents <= 8 && avgClarity >= 85) {
+      verdict = '🌟 <b>Studio-grade intonation!</b> Your pitch and embouchure align tightly with the true exemplar performance.';
+    } else if (avgCents <= 15) {
+      verdict = '✨ <b>Solid replication!</b> Clean single notes with close harmonic alignment to the original recording.';
+    } else {
+      verdict = '👍 <b>Good sequence flow!</b> Focus on steady breath support to pull your intonation closer to the center line.';
+    }
+    $('sc-verdict').innerHTML = verdict;
+  }
+
+  const isLast = activePhraseIdx >= activeSong.phrases.length - 1;
+  $('song-practice-msg').innerHTML = isLast
+    ? `🎉 <b>Full tune completed!</b> You mastered all phrases in ${activeSong.title}.`
+    : `✨ <b>Phrase ${activePhraseIdx + 1} mastered!</b> Review your replication stats above.`;
+
+  if (!isLast) {
+    const nextBtn = $('btn-song-next-phrase');
+    if (nextBtn) {
+      nextBtn.hidden = false;
+      nextBtn.textContent = `Next phrase (${activePhraseIdx + 2}/${activeSong.phrases.length}) →`;
+    }
+  }
+  renderPhraseStepper();
 }
 
 // =====================================================================
